@@ -1,3 +1,10 @@
+"""Scalar autograd engine.
+
+Each Node holds one float, the nodes that made it, and a closure that sends
+its gradient one step back to those nodes. Design notes, derivations, and the
+reasoning behind each choice are in docs/BACKPROPAGATION.md.
+"""
+
 import math
 from collections.abc import Callable
 from typing import Literal
@@ -44,12 +51,12 @@ class Node:
             propagate=backward,
         )
 
-    def __pow__(self, other: float) -> Node:
+    def __pow__(self, exponent: float) -> Node:
         def backward(g: float) -> None:
-            self.gradient += g * other * self.forward_val ** (other - 1)
+            self.gradient += g * exponent * self.forward_val ** (exponent - 1)
 
         return Node(
-            forward_val=self.forward_val**other, parents=(self,), propagate=backward
+            forward_val=self.forward_val**exponent, parents=(self,), propagate=backward
         )
 
     def exp(self) -> Node:
@@ -123,7 +130,7 @@ class Node:
                     stack.append((p, "expand"))
         return topological_order
 
-    def backward(self):
+    def backward(self) -> None:
         self.gradient = 1.0
         for n in reversed(self._topological_order()):
             n.propagate(n.gradient)
