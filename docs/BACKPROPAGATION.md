@@ -29,8 +29,8 @@ holds these fields:
 |-------------------------|-------------------------------------------------------------|
 | forward value           | the number computed in the forward pass                     |
 | gradient slot           | dL/d(this value), filled in during backprop, starts at zero |
-| parents                 | pointers to the values that produced this one               |
-| local backward function | given this node's gradient, push gradient to parents        |
+| children                | pointers to the values that produced this one               |
+| local backward function | given this node's gradient, push gradient to children       |
 
 Important: this applies to **each** value in the forward pass, not only to
 the weights. Intermediate results (the output of a multiply, an attention
@@ -46,26 +46,35 @@ so on, up to the loss.
 - The result is a **directed acyclic graph** (DAG). The values are the
   nodes. The operations are the edges.
 - The **loss** is the root.
-- The **weights** are leaves. These leaves are the values that we can
-  adjust.
+- A node's **children** are the values that were the inputs to the operation
+  that made it.
+- The **weights** are leaves. They have no children. These leaves are the
+  values that we can adjust.
 - All other nodes are intermediate results.
+
+We draw the graph with the loss at the top and the weights at the bottom. The
+edges point down, from each node to its children. This is the opposite of
+the direction in which the values were computed: a child exists before its
+parent, because the inputs are computed first. This is the convention of
+micrograd and PyTorch. Keep this picture in mind when you read "child" and
+"parent" in this document.
 
 We do not make the graph before the forward pass. The forward pass makes the
 graph **as a side effect**: each `+` and each `*` on node objects makes a new
-node. The new node records its parents. Thus, we must overload the arithmetic
+node. The new node records its children. Thus, we must overload the arithmetic
 operators of the node class to do this record.
 
 ## 4. Local derivatives
 
 Backprop comes to a node `c` with the value `dL/dc`. The node must compute
-`dL/d(parent)` for each parent and send it to that parent. The chain rule
+`dL/d(child)` for each child and send it to that child. The chain rule
 gives:
 
 ```
-dL/d(parent) = dL/dc * dc/d(parent)
+dL/d(child) = dL/dc * dc/d(child)
 ```
 
-The second factor, `dc/d(parent)`, is the **local derivative**. It depends only on the
+The second factor, `dc/d(child)`, is the **local derivative**. It depends only on the
 operation that made `c`.
 
 ### Addition: `c = a + b`
@@ -78,17 +87,17 @@ operation that made `c`.
 
 - `dc/da = b`, `dc/db = a`
 - `c` sends `dL/dc * b` to `a`. `c` sends `dL/dc * a` to `b`.
-- `c` must keep a reference to each parent. `a` alone does not know the
+- `c` must keep a reference to each child. `a` alone does not know the
   value of `b`.
 
 ### Power: `c = a ** n`
 
 - `n` is a plain number, not a node. It is fixed during the forward pass.
 - `dc/da = n * a ** (n - 1)` (the power rule).
-- `c` sends `dL/dc * n * a ** (n - 1)` to `a`. There is one parent, so
+- `c` sends `dL/dc * n * a ** (n - 1)` to `a`. There is one child, so
   there is one send.
 - `c` must keep a reference to `a` and must also keep the number `n`. `n` is
-  not a parent. It is not in the graph. The backward function must capture
+  not a child. It is not in the graph. The backward function must capture
   it in some other way.
 - Example: `c = a ** 2` with `a = 3`. Then `dc/da = 2 * 3 = 6`.
 
@@ -128,13 +137,13 @@ operation that made `c`.
 
 ### Where the derivative logic lives
 
-The computation occurs **at `c`**, not at the parents. `c` knows the
-operation that made it. `c` knows each parent. `c` receives the incoming
-gradient. A parent knows none of these things. If a parent had to compute its
+The computation occurs **at `c`**, not at the children. `c` knows the
+operation that made it. `c` knows each child. `c` receives the incoming
+gradient. A child knows none of these things. If a child had to compute its
 own gradient, it would have to know each operation that it was part of.
 
 Thus, each node carries a small function: "given my gradient, update the
-gradients of my parents." Addition makes one version of this function.
+gradients of my children." Addition makes one version of this function.
 Multiplication makes a different version. The generic backward pass calls
 these functions in the correct sequence. It does not have to know the
 operation of any node.
@@ -162,12 +171,12 @@ dL/dw = (contribution from c) + (contribution from d)
 
 ## 6. Visitation order
 
-A node can send gradient to its parents only when its own gradient is final.
+A node can send gradient to its children only when its own gradient is final.
 Thus, each node that depends on a value must be processed before that value.
 
 - Do a **post-order depth-first search** from the loss. This gives a list in
-  which each node comes after all nodes that it depends on (a topological
-  order). The loss is last.
+  which each node comes after all of its children (a topological order). The
+  loss is last.
 - **Reverse** the list. Then walk the list and call the local backward
   function of each node. The loss is now first.
 - Keep a **visited set**. Then a node that is reachable by more than one path
@@ -180,7 +189,7 @@ The backward pass has two jobs. The first job makes the ordered list. The
 second job walks the list and calls each local backward function with the
 gradient of its own node. We keep the two jobs in two functions. The first
 function does not touch a gradient slot. The second function does not look
-at a parent. The root sets its own gradient to `1.0` (`dL/dL`) one time,
+at a child. The root sets its own gradient to `1.0` (`dL/dL`) one time,
 before the walk starts.
 
 ### No recursion
@@ -203,11 +212,11 @@ each node goes on the stack two times, with a tag:
    step 2.
 4. Add the node to the visited set.
 5. Push the same node again with the tag `append`.
-6. Push each parent with the tag `expand`.
+6. Push each child with the tag `expand`.
 7. Go to step 2.
 
-The stack is last-in, first-out. The parents go on after the `append` entry,
-so they come off before it. Each parent is fully processed before the
+The stack is last-in, first-out. The children go on after the `append` entry,
+so they come off before it. Each child is fully processed before the
 `append` entry of the node comes back to the top. This reproduces the pause
 of the recursive version. The root is appended last.
 
@@ -221,7 +230,7 @@ Each node has two numbers: the forward value and the gradient slot. Backprop
 writes only to the gradient slot. It does not change the forward value.
 
 This rule must be strict for this reason: the local derivative of a
-multiplication is the *forward value of the other parent*. If a forward value
+multiplication is the *forward value of the other child*. If a forward value
 changed during the backward pass, each later node that reads it would compute
 its gradient from a number that the forward pass did not use. All gradients
 are defined with respect to the forward pass as it occurred. Thus, forward
@@ -289,7 +298,7 @@ method tells it.
 ### Floats become leaf nodes
 
 Inside `__add__`, `other` can be a float. A float has no `data`, no gradient
-slot, and no parents. The backward function of the output node will write to
+slot, and no children. The backward function of the output node will write to
 `other.grad`. This fails on a float.
 
 Thus, the first line of each primitive wraps the float:
@@ -299,7 +308,7 @@ if not isinstance(other, Node):
     other = Node(other)
 ```
 
-The wrapped float is a **leaf**. It has no parents. It gets a gradient slot
+The wrapped float is a **leaf**. It has no children. It gets a gradient slot
 that nothing reads. We accept this small waste over repetitive second code 
 paths for floats in each primitive and in each backward function.
 
@@ -307,7 +316,7 @@ paths for floats in each primitive and in each backward function.
 
 Only `__add__`, `__mul__`, `__pow__`, `exp`, `log`, and `relu` have backward
 functions. The other operators are built from these. Each combination makes
-one or more nodes in the graph, each with its own parents and backward
+one or more nodes in the graph, each with its own children and backward
 function. Python has no operator for `exp`, `log`, or `relu`, so they are
 named methods, not dunder methods.
 

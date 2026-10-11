@@ -14,11 +14,11 @@ class Node:
     def __init__(
         self,
         forward_val: float,
-        parents: tuple[Node, ...] = (),
+        children: tuple[Node, ...] = (),
         propagate: Callable[[float], None] = lambda g: None,
     ) -> None:
         self.forward_val: float = forward_val
-        self.parents: tuple[Node, ...] = parents
+        self.children: tuple[Node, ...] = children
         self.propagate: Callable[[float], None] = propagate
         self.gradient: float = 0.0
 
@@ -34,7 +34,7 @@ class Node:
 
         return Node(
             forward_val=self.forward_val + other.forward_val,
-            parents=(self, other),
+            children=(self, other),
             propagate=backward,
         )
 
@@ -47,7 +47,7 @@ class Node:
 
         return Node(
             forward_val=self.forward_val * other.forward_val,
-            parents=(self, other),
+            children=(self, other),
             propagate=backward,
         )
 
@@ -56,7 +56,7 @@ class Node:
             self.gradient += g * exponent * self.forward_val ** (exponent - 1)
 
         return Node(
-            forward_val=self.forward_val**exponent, parents=(self,), propagate=backward
+            forward_val=self.forward_val**exponent, children=(self,), propagate=backward
         )
 
     def exp(self) -> Node:
@@ -67,7 +67,7 @@ class Node:
 
         return Node(
             forward_val=result,
-            parents=(self,),
+            children=(self,),
             propagate=backward,
         )
 
@@ -77,7 +77,7 @@ class Node:
 
         return Node(
             forward_val=math.log(self.forward_val),
-            parents=(self,),
+            children=(self,),
             propagate=backward,
         )
 
@@ -88,7 +88,7 @@ class Node:
 
         return Node(
             forward_val=max(0.0, self.forward_val),
-            parents=(self,),
+            children=(self,),
             propagate=backward,
         )
 
@@ -126,8 +126,8 @@ class Node:
                     continue
                 visited.add(node)
                 stack.append((node, "append"))
-                for p in node.parents:
-                    stack.append((p, "expand"))
+                for c in node.children:
+                    stack.append((c, "expand"))
         return topological_order
 
     def backward(self) -> None:

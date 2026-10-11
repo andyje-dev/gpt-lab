@@ -16,8 +16,8 @@ def test_leaf_stores_forward_value() -> None:
     assert Node(3.0).forward_val == 3.0
 
 
-def test_leaf_has_no_parents() -> None:
-    assert Node(3.0).parents == ()
+def test_leaf_has_no_children() -> None:
+    assert Node(3.0).children == ()
 
 
 def test_leaf_gradient_starts_at_zero() -> None:
@@ -94,19 +94,19 @@ def test_forward_value(expr, expected: float) -> None:
 # --- Group 3: graph construction (Sections 3 and 9) --------------------------
 
 
-def test_add_records_both_operands_as_parents() -> None:
+def test_add_records_both_operands_as_children() -> None:
     a, b = Node(1.0), Node(2.0)
-    assert (a + b).parents == (a, b)
+    assert (a + b).children == (a, b)
 
 
-def test_mul_records_both_operands_as_parents() -> None:
+def test_mul_records_both_operands_as_children() -> None:
     a, b = Node(1.0), Node(2.0)
-    assert (a * b).parents == (a, b)
+    assert (a * b).children == (a, b)
 
 
-def test_pow_records_only_the_base_as_parent() -> None:
+def test_pow_records_only_the_base_as_child() -> None:
     a = Node(2.0)
-    assert (a**3).parents == (a,)
+    assert (a**3).children == (a,)
 
 
 @pytest.mark.parametrize(
@@ -114,9 +114,9 @@ def test_pow_records_only_the_base_as_parent() -> None:
     [lambda a: a.exp(), lambda a: a.log(), lambda a: a.relu()],
     ids=["exp", "log", "relu"],
 )
-def test_unary_primitive_records_only_its_input_as_parent(expr) -> None:
+def test_unary_primitive_records_only_its_input_as_child(expr) -> None:
     a = Node(2.0)
-    assert expr(a).parents == (a,)
+    assert expr(a).children == (a,)
 
 
 @pytest.mark.parametrize(
@@ -127,16 +127,16 @@ def test_unary_primitive_records_only_its_input_as_parent(expr) -> None:
 def test_float_operand_is_wrapped_as_a_leaf(expr) -> None:
     a = Node(1.0)
     result = expr(a)
-    assert len(result.parents) == 2
-    wrapped = result.parents[1]
+    assert len(result.children) == 2
+    wrapped = result.children[1]
     assert isinstance(wrapped, Node)
     assert wrapped.forward_val == 2.0
-    assert wrapped.parents == ()
+    assert wrapped.children == ()
 
 
 # --- Group 4: local derivatives in isolation (Section 4) ---------------------
 
-SEED = 0.25  # pre-existing gradient on the parents; must survive the call
+SEED = 0.25  # pre-existing gradient on the children; must survive the call
 G = 2.5  # incoming gradient dL/dc; must be multiplied, not ignored
 
 
@@ -239,7 +239,7 @@ def test_backward_on_a_leaf_sets_its_own_gradient_to_one() -> None:
     assert a.gradient == pytest.approx(1.0)
 
 
-def test_backward_reaches_the_parents_of_one_operation() -> None:
+def test_backward_reaches_the_children_of_one_operation() -> None:
     # c = a * b -> dc/da = b = -7, dc/db = a = 3
     a, b = Node(3.0), Node(-7.0)
     c = a * b
@@ -305,7 +305,7 @@ def test_backward_visits_each_node_once() -> None:
     a, b = Node(3.0), Node(4.0)
     loss = a * b + a**2
     calls: dict[int, int] = {}
-    for node in (loss, *loss.parents, a, b):
+    for node in (loss, *loss.children, a, b):
         original = node.propagate
 
         def counting(g: float, node: Node = node, original=original) -> None:
