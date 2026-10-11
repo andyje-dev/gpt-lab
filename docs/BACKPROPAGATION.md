@@ -30,7 +30,7 @@ holds these fields:
 | forward value           | the number computed in the forward pass                     |
 | gradient slot           | dL/d(this value), filled in during backprop, starts at zero |
 | children                | pointers to the values that produced this one               |
-| local backward function | given this node's gradient, push gradient to children       |
+| propagate function      | given this node's gradient, push gradient to children       |
 
 Important: this applies to **each** value in the forward pass, not only to
 the weights. Intermediate results (the output of a multiply, an attention
@@ -97,15 +97,16 @@ operation that made `c`.
 - `c` sends `dL/dc * n * a ** (n - 1)` to `a`. There is one child, so
   there is one send.
 - `c` must keep a reference to `a` and must also keep the number `n`. `n` is
-  not a child. It is not in the graph. The backward function must capture
-  it in some other way.
+  not a child. It is not in the graph. The propagate function must capture
+  it in some other way. In the code, `n` is the `exponent` parameter of
+  `__pow__`.
 - Example: `c = a ** 2` with `a = 3`. Then `dc/da = 2 * 3 = 6`.
 
 ### Exponent: `c = exp(a)`
 
 - `dc/da = exp(a)`. This is the value of `c` itself.
 - `c` sends `dL/dc * c` to `a`.
-- The backward function needs only the forward value of `c`. The forward
+- The propagate function needs only the forward value of `c`. The forward
   pass already computed it. Nothing is computed twice.
 - Softmax needs this: `p_i = exp(x_i) / sum_j exp(x_j)`. The sum is repeated
   `+`. The division is `*` with `** -1`. Only `exp` is new.
@@ -119,7 +120,7 @@ operation that made `c`.
 
 - `dc/da = 1 / a`
 - `c` sends `dL/dc / a` to `a`.
-- The backward function needs the forward value of `a`.
+- The propagate function needs the forward value of `a`.
 - Cross-entropy loss needs this: `loss = -log(p_target)`.
 - When `p_target` is near zero, `1 / a` is very large. A very large gradient
   here means the model is confidently wrong. If a gradient becomes `inf` or
@@ -132,7 +133,7 @@ operation that made `c`.
 - At `a == 0` the derivative is not defined. We choose `0`. A float lands
   on exactly `0` almost never, so the choice has no effect in practice.
 - The MLP clamps against the constant `0`.
-- The backward function needs the forward value of `a`. The test `c > 0`
+- The propagate function needs the forward value of `a`. The test `c > 0`
   gives the same answer, so the forward value of `c` works too.
 
 ### Where the derivative logic lives
@@ -143,7 +144,8 @@ gradient. A child knows none of these things. If a child had to compute its
 own gradient, it would have to know each operation that it was part of.
 
 Thus, each node carries a small function: "given my gradient, update the
-gradients of my children." Addition makes one version of this function.
+gradients of my children." In the code, this is the `propagate` attribute.
+Addition makes one version of this function.
 Multiplication makes a different version. The generic backward pass calls
 these functions in the correct sequence. It does not have to know the
 operation of any node.
@@ -186,10 +188,10 @@ Thus, each node that depends on a value must be processed before that value.
 ### Two jobs, two functions
 
 The backward pass has two jobs. The first job makes the ordered list. The
-second job walks the list and calls each local backward function with the
-gradient of its own node. We keep the two jobs in two functions. The first
-function does not touch a gradient slot. The second function does not look
-at a child. The root sets its own gradient to `1.0` (`dL/dL`) one time,
+second job walks the list and calls each propagate function with the
+gradient of its own node. We keep the two jobs in two functions:
+`_topological_order` and `backward`. The first function does not touch a
+gradient slot. The second function does not look at a child. The root sets its own gradient to `1.0` (`dL/dL`) one time,
 before the walk starts.
 
 ### No recursion
@@ -246,7 +248,7 @@ There are three stages:
 
 ### Backprop does not zero the gradient slots
 
-The local backward functions use `+=`. They add to a gradient slot. They do
+The propagate functions use `+=`. They add to a gradient slot. They do
 not replace it. The backward pass does not clear the slots before the walk.
 Thus, a second call to `backward()` on the same graph adds the same
 contributions a second time.
@@ -297,20 +299,19 @@ method tells it.
 
 ### Floats become leaf nodes
 
-Inside `__add__`, `other` can be a float. A float has no `data`, no gradient
-slot, and no children. The backward function of the output node will write to
-`other.grad`. This fails on a float.
+Inside `__add__`, `other` can be a float. A float has no `forward_val`, no
+gradient slot, and no children. The propagate function of the output node
+will write to `other.gradient`. This fails on a float.
 
 Thus, the first line of each primitive wraps the float:
 
 ```python
-if not isinstance(other, Node):
-    other = Node(other)
+other = other if isinstance(other, Node) else Node(other)
 ```
 
 The wrapped float is a **leaf**. It has no children. It gets a gradient slot
 that nothing reads. We accept this small waste over repetitive second code 
-paths for floats in each primitive and in each backward function.
+paths for floats in each primitive and in each propagate function.
 
 ### Six primitives, seven combinations
 

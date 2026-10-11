@@ -24,7 +24,7 @@ def test_leaf_gradient_starts_at_zero() -> None:
     assert Node(3.0).gradient == 0.0
 
 
-def test_leaf_backward_is_a_safe_no_op() -> None:
+def test_leaf_propagate_is_a_safe_no_op() -> None:
     leaf = Node(3.0)
     leaf.propagate(1.0)
     assert leaf.gradient == 0.0
@@ -145,7 +145,7 @@ def _seeded(*nodes: Node) -> None:
         n.gradient = SEED
 
 
-def test_add_backward_passes_gradient_through_unchanged() -> None:
+def test_add_propagate_passes_gradient_through_unchanged() -> None:
     a, b = Node(3.0), Node(-7.0)
     c = a + b
     _seeded(a, b)
@@ -154,7 +154,7 @@ def test_add_backward_passes_gradient_through_unchanged() -> None:
     assert b.gradient == pytest.approx(SEED + G)
 
 
-def test_mul_backward_swaps_operand_values() -> None:
+def test_mul_propagate_swaps_operand_values() -> None:
     a, b = Node(3.0), Node(-7.0)
     c = a * b
     _seeded(a, b)
@@ -168,7 +168,7 @@ def test_mul_backward_swaps_operand_values() -> None:
     [(3.0, 2), (3.0, -1), (4.0, 0.5), (2.0, 0)],
     ids=["square", "reciprocal", "sqrt", "zeroth"],
 )
-def test_pow_backward_uses_power_rule(base: float, n: float) -> None:
+def test_pow_propagate_uses_power_rule(base: float, n: float) -> None:
     a = Node(base)
     c = a**n
     _seeded(a)
@@ -176,7 +176,7 @@ def test_pow_backward_uses_power_rule(base: float, n: float) -> None:
     assert a.gradient == pytest.approx(SEED + G * n * base ** (n - 1))
 
 
-def test_exp_backward_reuses_its_own_forward_value() -> None:
+def test_exp_propagate_reuses_its_own_forward_value() -> None:
     # d/da exp(a) = exp(a) = c. Nothing is recomputed.
     a = Node(3.0)
     c = a.exp()
@@ -185,7 +185,7 @@ def test_exp_backward_reuses_its_own_forward_value() -> None:
     assert a.gradient == pytest.approx(SEED + G * c.forward_val)
 
 
-def test_log_backward_uses_reciprocal_of_input() -> None:
+def test_log_propagate_uses_reciprocal_of_input() -> None:
     # d/da log(a) = 1 / a
     a = Node(3.0)
     c = a.log()
@@ -199,7 +199,7 @@ def test_log_backward_uses_reciprocal_of_input() -> None:
     [(3.0, 1.0), (-7.0, 0.0), (0.0, 0.0)],
     ids=["positive", "negative", "zero"],
 )
-def test_relu_backward_passes_gradient_only_when_positive(
+def test_relu_propagate_passes_gradient_only_when_positive(
     value: float, slope: float
 ) -> None:
     # d/da max(0, a) = 1 if a > 0 else 0. At a == 0 we choose 0.

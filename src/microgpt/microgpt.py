@@ -28,68 +28,70 @@ class Node:
     def __add__(self, other: float | Node) -> Node:
         other = other if isinstance(other, Node) else Node(other)
 
-        def backward(g: float) -> None:
+        def propagate(g: float) -> None:
             self.gradient += g
             other.gradient += g
 
         return Node(
             forward_val=self.forward_val + other.forward_val,
             children=(self, other),
-            propagate=backward,
+            propagate=propagate,
         )
 
     def __mul__(self, other: float | Node) -> Node:
         other = other if isinstance(other, Node) else Node(other)
 
-        def backward(g: float) -> None:
+        def propagate(g: float) -> None:
             self.gradient += g * other.forward_val
             other.gradient += g * self.forward_val
 
         return Node(
             forward_val=self.forward_val * other.forward_val,
             children=(self, other),
-            propagate=backward,
+            propagate=propagate,
         )
 
     def __pow__(self, exponent: float) -> Node:
-        def backward(g: float) -> None:
+        def propagate(g: float) -> None:
             self.gradient += g * exponent * self.forward_val ** (exponent - 1)
 
         return Node(
-            forward_val=self.forward_val**exponent, children=(self,), propagate=backward
+            forward_val=self.forward_val**exponent,
+            children=(self,),
+            propagate=propagate,
         )
 
     def exp(self) -> Node:
         result = math.exp(self.forward_val)
 
-        def backward(g: float) -> None:
+        def propagate(g: float) -> None:
             self.gradient += g * result
 
         return Node(
             forward_val=result,
             children=(self,),
-            propagate=backward,
+            propagate=propagate,
         )
 
     def log(self) -> Node:
-        def backward(g: float) -> None:
+        def propagate(g: float) -> None:
             self.gradient += g / self.forward_val
 
         return Node(
             forward_val=math.log(self.forward_val),
             children=(self,),
-            propagate=backward,
+            propagate=propagate,
         )
 
     def relu(self) -> Node:
-        def backward(g: float) -> None:
+        def propagate(g: float) -> None:
             if self.forward_val > 0:
                 self.gradient += g
 
         return Node(
             forward_val=max(0.0, self.forward_val),
             children=(self,),
-            propagate=backward,
+            propagate=propagate,
         )
 
     def __radd__(self, other: float | Node) -> Node:
