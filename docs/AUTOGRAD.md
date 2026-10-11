@@ -1,15 +1,30 @@
 # Autograd: Design Notes
 
-> Code: `src/microgpt/autograd.py`
-> Tests: `tests/microgpt/test_autograd.py`
+> Code: `src/gptlab/autograd.py`
+> Tests: `tests/gptlab/test_autograd.py`
 
 ---
+
+## Contents
+
+- [How to read this document](#how-to-read-this-document)
+- [1. The problem](#1-the-problem)
+- [2. The Node](#2-the-node)
+- [3. The graph](#3-the-graph)
+- [4. The propagate function](#4-the-propagate-function)
+- [5. Accumulate the gradients](#5-accumulate-the-gradients)
+- [6. The six primitives](#6-the-six-primitives)
+- [7. Derived operators](#7-derived-operators)
+- [8. Topological order](#8-topological-order)
+- [9. The backward pass](#9-the-backward-pass)
+- [10. Check the gradients with numbers](#10-check-the-gradients-with-numbers)
+
 
 ## How to read this document
 
 The sections of this document follow the order of the code. Read one
-section. Then read the code that the section names. Then go to the next
-section. No section depends on a later section.
+section. Then read the code that the section names. No section depends 
+on a later section.
 
 Each numbered section starts with two lines:
 
