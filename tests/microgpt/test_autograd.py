@@ -1,6 +1,6 @@
 """Unit tests for the scalar autograd Node class.
 
-Each test group maps to a section of docs/BACKPROPAGATION.md.
+Each test group maps to a section of docs/AUTOGRAD.md.
 """
 
 import math
@@ -30,7 +30,7 @@ def test_leaf_propagate_is_a_safe_no_op() -> None:
     assert leaf.gradient == 0.0
 
 
-# --- Group 2: forward values for every operator (Section 9) ------------------
+# --- Group 2: forward values for every operator (Section 7) ------------------
 
 A, B = 1.5, -4.0
 
@@ -91,7 +91,7 @@ def test_forward_value(expr, expected: float) -> None:
     assert result.forward_val == pytest.approx(expected)
 
 
-# --- Group 3: graph construction (Sections 3 and 9) --------------------------
+# --- Group 3: graph construction (Sections 3 and 6) --------------------------
 
 
 def test_add_records_both_operands_as_children() -> None:
@@ -134,7 +134,7 @@ def test_float_operand_is_wrapped_as_a_leaf(expr) -> None:
     assert wrapped.children == ()
 
 
-# --- Group 4: local derivatives in isolation (Section 4) ---------------------
+# --- Group 4: local derivatives in isolation (Section 6) ---------------------
 
 SEED = 0.25  # pre-existing gradient on the children; must survive the call
 G = 2.5  # incoming gradient dL/dc; must be multiplied, not ignored
@@ -229,7 +229,7 @@ def test_node_multiplied_by_itself_accumulates_both_sides() -> None:
     assert w.gradient == pytest.approx(2 * 3.0)
 
 
-# --- Group 6: the full backward pass (Section 6) -----------------------------
+# --- Group 6: the full backward pass (Sections 8 and 9) ----------------------
 
 
 def test_backward_on_a_leaf_sets_its_own_gradient_to_one() -> None:
@@ -318,7 +318,7 @@ def test_backward_visits_each_node_once() -> None:
 
 
 def test_backward_does_not_reset_gradients_between_calls() -> None:
-    # Section 7: zeroing gradients is the job of the optimizer, not backward.
+    # Section 9: zeroing gradients is the job of the optimizer, not backward.
     # A second call on the same graph adds the same contributions again.
     a, b = Node(3.0), Node(-7.0)
     c = a * b
@@ -348,7 +348,7 @@ def test_backward_survives_a_deep_chain() -> None:
     assert a.gradient == pytest.approx(1.0)
 
 
-# --- Group 7: numeric gradient check (Section 4) -----------------------------
+# --- Group 7: numeric gradient check (Section 10) ----------------------------
 #
 # Independent of the hand derivations above: compare the autograd result
 # against a central finite difference, (f(x + h) - f(x - h)) / (2h).

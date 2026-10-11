@@ -2,7 +2,7 @@
 
 Each Node holds one float, the nodes that made it, and a closure that sends
 its gradient one step back to those nodes. Design notes, derivations, and the
-reasoning behind each choice are in docs/BACKPROPAGATION.md.
+reasoning behind each choice are in docs/AUTOGRAD.md.
 """
 
 import math
