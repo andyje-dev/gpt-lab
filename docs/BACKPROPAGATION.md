@@ -92,6 +92,40 @@ operation that made `c`.
   it in some other way.
 - Example: `c = a ** 2` with `a = 3`. Then `dc/da = 2 * 3 = 6`.
 
+### Exponent: `c = exp(a)`
+
+- `dc/da = exp(a)`. This is the value of `c` itself.
+- `c` sends `dL/dc * c` to `a`.
+- The backward function needs only the forward value of `c`. The forward
+  pass already computed it. Nothing is computed twice.
+- Softmax needs this: `p_i = exp(x_i) / sum_j exp(x_j)`. The sum is repeated
+  `+`. The division is `*` with `** -1`. Only `exp` is new.
+- `exp` of a large value overflows. Softmax gives the same `p_i` when the
+  same number is subtracted from each `x_i`. Subtract the largest `x_i` as a
+  plain float. It is not a node. No gradient flows through it. This is exact,
+  not an approximation: the derivative of softmax with respect to that shift
+  is zero.
+
+### Logarithm: `c = log(a)`
+
+- `dc/da = 1 / a`
+- `c` sends `dL/dc / a` to `a`.
+- The backward function needs the forward value of `a`.
+- Cross-entropy loss needs this: `loss = -log(p_target)`.
+- When `p_target` is near zero, `1 / a` is very large. A very large gradient
+  here means the model is confidently wrong. If a gradient becomes `inf` or
+  `nan`, look here first.
+
+### ReLU: `c = max(0, a)`
+
+- `dc/da = 1` if `a > 0`, else `0`.
+- `c` sends `dL/dc` to `a` when `a > 0`. It sends nothing when `a <= 0`.
+- At `a == 0` the derivative is not defined. We choose `0`. A float lands
+  on exactly `0` almost never, so the choice has no effect in practice.
+- The MLP clamps against the constant `0`.
+- The backward function needs the forward value of `a`. The test `c > 0`
+  gives the same answer, so the forward value of `c` works too.
+
 ### Where the derivative logic lives
 
 The computation occurs **at `c`**, not at the parents. `c` knows the
@@ -269,17 +303,22 @@ The wrapped float is a **leaf**. It has no parents. It gets a gradient slot
 that nothing reads. We accept this small waste over repetitive second code 
 paths for floats in each primitive and in each backward function.
 
-### Three primitives, seven combinations
+### Six primitives, seven combinations
 
-Only `__add__`, `__mul__`, and `__pow__` have backward functions. The other
-operators are built from these three. Each combination makes one or more
-nodes in the graph, each with its own parents and backward function.
+Only `__add__`, `__mul__`, `__pow__`, `exp`, `log`, and `relu` have backward
+functions. The other operators are built from these. Each combination makes
+one or more nodes in the graph, each with its own parents and backward
+function. Python has no operator for `exp`, `log`, or `relu`, so they are
+named methods, not dunder methods.
 
 | Expression | Method          | Body                            |
 |------------|-----------------|---------------------------------|
 | `a + b`    | `__add__`       | primitive                       |
 | `a * b`    | `__mul__`       | primitive                       |
 | `a ** 2`   | `__pow__`       | primitive, number exponent only |
+| `a.exp()`  | `exp`           | primitive                       |
+| `a.log()`  | `log`           | primitive                       |
+| `a.relu()` | `relu`          | primitive                       |
 | `2.0 + a`  | `__radd__`      | `self + other`                  |
 | `2.0 * a`  | `__rmul__`      | `self * other`                  |
 | `-a`       | `__neg__`       | `self * -1`                     |
@@ -292,3 +331,15 @@ Note on `__pow__`: the exponent is a plain number, not a node. A node
 exponent would need a different local derivative (it includes the log of the
 base). The GPT only raises values to fixed powers, so we do not build the
 general case.
+
+## 10. Open questions carried forward
+
+These questions came up during the discussion. We do not answer them here.
+We will resolve them during implementation. Resolved questions move to a
+numbered section above.
+
+- Must the selection of a row from the embedding table be its own autograd
+  operation with a local derivative? Or does the graph already do this with
+  no extra work?
+- Why does Adam move the embedding rows that received zero gradient in this
+  step, when plain gradient descent does not?

@@ -1,3 +1,4 @@
+import math
 from collections.abc import Callable
 from typing import Literal
 
@@ -49,6 +50,39 @@ class Node:
 
         return Node(
             forward_val=self.forward_val**other, parents=(self,), backward_func=backward
+        )
+
+    def exp(self) -> Node:
+        result = math.exp(self.forward_val)
+
+        def backward(g: float) -> None:
+            self.gradient += g * result
+
+        return Node(
+            forward_val=result,
+            parents=(self,),
+            backward_func=backward,
+        )
+
+    def log(self) -> Node:
+        def backward(g: float) -> None:
+            self.gradient += g / self.forward_val
+
+        return Node(
+            forward_val=math.log(self.forward_val),
+            parents=(self,),
+            backward_func=backward,
+        )
+
+    def relu(self) -> Node:
+        def backward(g: float) -> None:
+            if self.forward_val > 0:
+                self.gradient += g
+
+        return Node(
+            forward_val=max(0.0, self.forward_val),
+            parents=(self,),
+            backward_func=backward,
         )
 
     def __radd__(self, other: float | Node) -> Node:

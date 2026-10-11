@@ -3,6 +3,8 @@
 Each test group maps to a section of docs/BACKPROPAGATION.md.
 """
 
+import math
+
 import pytest
 
 from microgpt.microgpt import Node
@@ -42,6 +44,10 @@ A, B = 1.5, -4.0
         (lambda a, _: a**2, A**2),
         (lambda a, _: a**-1, A**-1),
         (lambda a, _: a**0.5, A**0.5),
+        (lambda a, _: a.exp(), math.exp(A)),
+        (lambda a, _: a.log(), math.log(A)),
+        (lambda a, _: a.relu(), A),
+        (lambda _, b: b.relu(), 0.0),
         # node with float, both orders
         (lambda a, _: a + B, A + B),
         (lambda a, _: B + a, B + A),
@@ -62,6 +68,10 @@ A, B = 1.5, -4.0
         "pow_int",
         "pow_neg",
         "pow_frac",
+        "exp",
+        "log",
+        "relu_positive",
+        "relu_negative",
         "add_float",
         "radd_float",
         "mul_float",
@@ -97,6 +107,16 @@ def test_mul_records_both_operands_as_parents() -> None:
 def test_pow_records_only_the_base_as_parent() -> None:
     a = Node(2.0)
     assert (a**3).parents == (a,)
+
+
+@pytest.mark.parametrize(
+    "expr",
+    [lambda a: a.exp(), lambda a: a.log(), lambda a: a.relu()],
+    ids=["exp", "log", "relu"],
+)
+def test_unary_primitive_records_only_its_input_as_parent(expr) -> None:
+    a = Node(2.0)
+    assert expr(a).parents == (a,)
 
 
 @pytest.mark.parametrize(
@@ -154,6 +174,40 @@ def test_pow_backward_uses_power_rule(base: float, n: float) -> None:
     _seeded(a)
     c.backward_func(G)
     assert a.gradient == pytest.approx(SEED + G * n * base ** (n - 1))
+
+
+def test_exp_backward_reuses_its_own_forward_value() -> None:
+    # d/da exp(a) = exp(a) = c. Nothing is recomputed.
+    a = Node(3.0)
+    c = a.exp()
+    _seeded(a)
+    c.backward_func(G)
+    assert a.gradient == pytest.approx(SEED + G * c.forward_val)
+
+
+def test_log_backward_uses_reciprocal_of_input() -> None:
+    # d/da log(a) = 1 / a
+    a = Node(3.0)
+    c = a.log()
+    _seeded(a)
+    c.backward_func(G)
+    assert a.gradient == pytest.approx(SEED + G / 3.0)
+
+
+@pytest.mark.parametrize(
+    ("value", "slope"),
+    [(3.0, 1.0), (-7.0, 0.0), (0.0, 0.0)],
+    ids=["positive", "negative", "zero"],
+)
+def test_relu_backward_passes_gradient_only_when_positive(
+    value: float, slope: float
+) -> None:
+    # d/da max(0, a) = 1 if a > 0 else 0. At a == 0 we choose 0.
+    a = Node(value)
+    c = a.relu()
+    _seeded(a)
+    c.backward_func(G)
+    assert a.gradient == pytest.approx(SEED + G * slope)
 
 
 # --- Group 5: accumulation across consumers (Section 5) ----------------------
@@ -304,23 +358,50 @@ H = 1e-6
 TOL = 1e-6
 
 
-def _loss(a: float | Node, b: float | Node) -> float | Node:
+def _exp(x: float | Node) -> float | Node:
+    return x.exp() if isinstance(x, Node) else math.exp(x)
+
+
+def _log(x: float | Node) -> float | Node:
+    return x.log() if isinstance(x, Node) else math.log(x)
+
+
+def _relu(x: float | Node) -> float | Node:
+    return x.relu() if isinstance(x, Node) else max(0.0, x)
+
+
+def _loss_arithmetic(a: float | Node, b: float | Node) -> float | Node:
     # Uses every operator: +, *, **, -, /, unary -, and float on both sides.
     return (a * b - 2.0) / (a**2 + 1.0) + (3.0 - b) * -a + 1.0 / b
 
 
+def _loss_nonlinear(a: float | Node, b: float | Node) -> float | Node:
+    # A two-class softmax cross-entropy with a as the target logit, plus a
+    # ReLU term. Uses exp, log, and relu in the shape the model will use them.
+    # a * b is never near 0 for the sample points, so the ReLU kink is avoided.
+    p = _exp(a) / (_exp(a) + _exp(b))
+    return -_log(p) + _relu(a * b)
+
+
+@pytest.mark.parametrize(
+    "loss_fn",
+    [_loss_arithmetic, _loss_nonlinear],
+    ids=["arithmetic", "nonlinear"],
+)
 @pytest.mark.parametrize(
     ("a_val", "b_val"),
     [(1.5, -4.0), (0.3, 2.0), (-2.0, 0.7)],
 )
-def test_backward_matches_finite_difference(a_val: float, b_val: float) -> None:
+def test_backward_matches_finite_difference(
+    loss_fn, a_val: float, b_val: float
+) -> None:
     a, b = Node(a_val), Node(b_val)
-    loss = _loss(a, b)
+    loss = loss_fn(a, b)
     assert isinstance(loss, Node)
     loss.backward()
 
-    numeric_da = (_loss(a_val + H, b_val) - _loss(a_val - H, b_val)) / (2 * H)
-    numeric_db = (_loss(a_val, b_val + H) - _loss(a_val, b_val - H)) / (2 * H)
+    numeric_da = (loss_fn(a_val + H, b_val) - loss_fn(a_val - H, b_val)) / (2 * H)
+    numeric_db = (loss_fn(a_val, b_val + H) - loss_fn(a_val, b_val - H)) / (2 * H)
 
     assert a.gradient == pytest.approx(numeric_da, abs=TOL)
     assert b.gradient == pytest.approx(numeric_db, abs=TOL)
