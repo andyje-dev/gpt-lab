@@ -26,7 +26,7 @@ def test_leaf_gradient_starts_at_zero() -> None:
 
 def test_leaf_backward_is_a_safe_no_op() -> None:
     leaf = Node(3.0)
-    leaf.backward_func(1.0)
+    leaf.propagate(1.0)
     assert leaf.gradient == 0.0
 
 
@@ -149,7 +149,7 @@ def test_add_backward_passes_gradient_through_unchanged() -> None:
     a, b = Node(3.0), Node(-7.0)
     c = a + b
     _seeded(a, b)
-    c.backward_func(G)
+    c.propagate(G)
     assert a.gradient == pytest.approx(SEED + G)
     assert b.gradient == pytest.approx(SEED + G)
 
@@ -158,7 +158,7 @@ def test_mul_backward_swaps_operand_values() -> None:
     a, b = Node(3.0), Node(-7.0)
     c = a * b
     _seeded(a, b)
-    c.backward_func(G)
+    c.propagate(G)
     assert a.gradient == pytest.approx(SEED + G * -7.0)
     assert b.gradient == pytest.approx(SEED + G * 3.0)
 
@@ -172,7 +172,7 @@ def test_pow_backward_uses_power_rule(base: float, n: float) -> None:
     a = Node(base)
     c = a**n
     _seeded(a)
-    c.backward_func(G)
+    c.propagate(G)
     assert a.gradient == pytest.approx(SEED + G * n * base ** (n - 1))
 
 
@@ -181,7 +181,7 @@ def test_exp_backward_reuses_its_own_forward_value() -> None:
     a = Node(3.0)
     c = a.exp()
     _seeded(a)
-    c.backward_func(G)
+    c.propagate(G)
     assert a.gradient == pytest.approx(SEED + G * c.forward_val)
 
 
@@ -190,7 +190,7 @@ def test_log_backward_uses_reciprocal_of_input() -> None:
     a = Node(3.0)
     c = a.log()
     _seeded(a)
-    c.backward_func(G)
+    c.propagate(G)
     assert a.gradient == pytest.approx(SEED + G / 3.0)
 
 
@@ -206,7 +206,7 @@ def test_relu_backward_passes_gradient_only_when_positive(
     a = Node(value)
     c = a.relu()
     _seeded(a)
-    c.backward_func(G)
+    c.propagate(G)
     assert a.gradient == pytest.approx(SEED + G * slope)
 
 
@@ -217,15 +217,15 @@ def test_node_used_twice_accumulates_both_contributions() -> None:
     w, x, y = Node(2.0), Node(3.0), Node(5.0)
     c = w * x
     d = w * y
-    c.backward_func(1.0)
-    d.backward_func(1.0)
+    c.propagate(1.0)
+    d.propagate(1.0)
     assert w.gradient == pytest.approx(3.0 + 5.0)
 
 
 def test_node_multiplied_by_itself_accumulates_both_sides() -> None:
     w = Node(3.0)
     c = w * w
-    c.backward_func(1.0)
+    c.propagate(1.0)
     assert w.gradient == pytest.approx(2 * 3.0)
 
 
@@ -306,13 +306,13 @@ def test_backward_visits_each_node_once() -> None:
     loss = a * b + a**2
     calls: dict[int, int] = {}
     for node in (loss, *loss.parents, a, b):
-        original = node.backward_func
+        original = node.propagate
 
         def counting(g: float, node: Node = node, original=original) -> None:
             calls[id(node)] = calls.get(id(node), 0) + 1
             original(g)
 
-        node.backward_func = counting
+        node.propagate = counting
     loss.backward()
     assert all(count == 1 for count in calls.values()), calls
 

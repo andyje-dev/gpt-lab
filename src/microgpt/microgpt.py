@@ -8,11 +8,11 @@ class Node:
         self,
         forward_val: float,
         parents: tuple[Node, ...] = (),
-        backward_func: Callable[[float], None] = lambda g: None,
+        propagate: Callable[[float], None] = lambda g: None,
     ) -> None:
         self.forward_val: float = forward_val
         self.parents: tuple[Node, ...] = parents
-        self.backward_func: Callable[[float], None] = backward_func
+        self.propagate: Callable[[float], None] = propagate
         self.gradient: float = 0.0
 
     def __repr__(self) -> str:
@@ -28,7 +28,7 @@ class Node:
         return Node(
             forward_val=self.forward_val + other.forward_val,
             parents=(self, other),
-            backward_func=backward,
+            propagate=backward,
         )
 
     def __mul__(self, other: float | Node) -> Node:
@@ -41,7 +41,7 @@ class Node:
         return Node(
             forward_val=self.forward_val * other.forward_val,
             parents=(self, other),
-            backward_func=backward,
+            propagate=backward,
         )
 
     def __pow__(self, other: float) -> Node:
@@ -49,7 +49,7 @@ class Node:
             self.gradient += g * other * self.forward_val ** (other - 1)
 
         return Node(
-            forward_val=self.forward_val**other, parents=(self,), backward_func=backward
+            forward_val=self.forward_val**other, parents=(self,), propagate=backward
         )
 
     def exp(self) -> Node:
@@ -61,7 +61,7 @@ class Node:
         return Node(
             forward_val=result,
             parents=(self,),
-            backward_func=backward,
+            propagate=backward,
         )
 
     def log(self) -> Node:
@@ -71,7 +71,7 @@ class Node:
         return Node(
             forward_val=math.log(self.forward_val),
             parents=(self,),
-            backward_func=backward,
+            propagate=backward,
         )
 
     def relu(self) -> Node:
@@ -82,7 +82,7 @@ class Node:
         return Node(
             forward_val=max(0.0, self.forward_val),
             parents=(self,),
-            backward_func=backward,
+            propagate=backward,
         )
 
     def __radd__(self, other: float | Node) -> Node:
@@ -126,4 +126,4 @@ class Node:
     def backward(self):
         self.gradient = 1.0
         for n in reversed(self._topological_order()):
-            n.backward_func(n.gradient)
+            n.propagate(n.gradient)
