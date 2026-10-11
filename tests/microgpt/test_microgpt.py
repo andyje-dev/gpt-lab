@@ -173,3 +173,154 @@ def test_node_multiplied_by_itself_accumulates_both_sides() -> None:
     c = w * w
     c.backward_func(1.0)
     assert w.gradient == pytest.approx(2 * 3.0)
+
+
+# --- Group 6: the full backward pass (Section 6) -----------------------------
+
+
+def test_backward_on_a_leaf_sets_its_own_gradient_to_one() -> None:
+    # dL/dL = 1. This is the seed the walk starts from.
+    a = Node(3.0)
+    a.backward()
+    assert a.gradient == pytest.approx(1.0)
+
+
+def test_backward_reaches_the_parents_of_one_operation() -> None:
+    # c = a * b -> dc/da = b = -7, dc/db = a = 3
+    a, b = Node(3.0), Node(-7.0)
+    c = a * b
+    c.backward()
+    assert c.gradient == pytest.approx(1.0)
+    assert a.gradient == pytest.approx(-7.0)
+    assert b.gradient == pytest.approx(3.0)
+
+
+def test_backward_chains_through_two_levels() -> None:
+    # d = (a * b) + 1 -> dd/dc = 1, dc/da = b = 3, so dd/da = 3 and dd/db = 2.
+    # c must run before a and b receive anything; if the order were wrong,
+    # a and b would be visited while c.gradient is still 0.
+    a, b = Node(2.0), Node(3.0)
+    c = a * b
+    d = c + 1.0
+    d.backward()
+    assert c.gradient == pytest.approx(1.0)
+    assert a.gradient == pytest.approx(3.0)
+    assert b.gradient == pytest.approx(2.0)
+
+
+def test_backward_sums_both_paths_in_a_diamond() -> None:
+    # L = a * b + a ** 2, with a = 3, b = 4
+    # dL/da = b + 2a = 4 + 6 = 10, dL/db = a = 3
+    # Path 1 (through a * b) gives 4. Path 2 (through a ** 2) gives 6.
+    # Each path must contribute exactly once. A missing visited set or a
+    # wrong order yields 4, 6, or something larger than 10.
+    a, b = Node(3.0), Node(4.0)
+    loss = a * b + a**2
+    loss.backward()
+    assert a.gradient == pytest.approx(10.0)
+    assert b.gradient == pytest.approx(3.0)
+
+
+def test_backward_through_a_node_consumed_by_a_deeper_node() -> None:
+    # L = c * (c + 1) where c = a * 2, a = 3 -> c = 6
+    # dL/dc = (c + 1) + c = 13, dc/da = 2, so dL/da = 26
+    # c is used directly by L and also by the intermediate (c + 1).
+    # The intermediate must finish before c sends anything to a.
+    a = Node(3.0)
+    c = a * 2.0
+    loss = c * (c + 1.0)
+    loss.backward()
+    assert c.gradient == pytest.approx(13.0)
+    assert a.gradient == pytest.approx(26.0)
+
+
+def test_backward_through_shared_node_and_separate_wrapped_leaves() -> None:
+    # L = (a + 1) * (a + 1), a = 2 -> L = 9
+    # dL/da = 2 * (a + 1) = 6
+    # The two `+ 1.0` calls make two different wrapped leaves, but a is shared.
+    a = Node(2.0)
+    loss = (a + 1.0) * (a + 1.0)
+    loss.backward()
+    assert a.gradient == pytest.approx(6.0)
+
+
+def test_backward_visits_each_node_once() -> None:
+    # Count how many times each node's backward function runs.
+    # In a diamond, a is reachable by two paths but must appear in the
+    # topological order exactly one time.
+    a, b = Node(3.0), Node(4.0)
+    loss = a * b + a**2
+    calls: dict[int, int] = {}
+    for node in (loss, *loss.parents, a, b):
+        original = node.backward_func
+
+        def counting(g: float, node: Node = node, original=original) -> None:
+            calls[id(node)] = calls.get(id(node), 0) + 1
+            original(g)
+
+        node.backward_func = counting
+    loss.backward()
+    assert all(count == 1 for count in calls.values()), calls
+
+
+def test_backward_does_not_reset_gradients_between_calls() -> None:
+    # Section 7: zeroing gradients is the job of the optimizer, not backward.
+    # A second call on the same graph adds the same contributions again.
+    a, b = Node(3.0), Node(-7.0)
+    c = a * b
+    c.backward()
+    c.backward()
+    assert a.gradient == pytest.approx(2 * -7.0)
+    assert b.gradient == pytest.approx(2 * 3.0)
+
+
+def test_backward_leaves_forward_values_frozen() -> None:
+    a, b = Node(3.0), Node(-7.0)
+    c = a * b + a**2
+    before = [n.forward_val for n in (a, b, c)]
+    c.backward()
+    assert [n.forward_val for n in (a, b, c)] == before
+
+
+def test_backward_survives_a_deep_chain() -> None:
+    # A GPT forward pass is thousands of operations deep. A recursive DFS
+    # would hit Python's default recursion limit (1000) long before that.
+    a = Node(1.0)
+    x = a
+    depth = 5_000
+    for _ in range(depth):
+        x = x + 1.0
+    x.backward()
+    assert a.gradient == pytest.approx(1.0)
+
+
+# --- Group 7: numeric gradient check (Section 4) -----------------------------
+#
+# Independent of the hand derivations above: compare the autograd result
+# against a central finite difference, (f(x + h) - f(x - h)) / (2h).
+# With h = 1e-6 the truncation error is O(h^2), so a 1e-6 tolerance is honest.
+
+H = 1e-6
+TOL = 1e-6
+
+
+def _loss(a: float | Node, b: float | Node) -> float | Node:
+    # Uses every operator: +, *, **, -, /, unary -, and float on both sides.
+    return (a * b - 2.0) / (a**2 + 1.0) + (3.0 - b) * -a + 1.0 / b
+
+
+@pytest.mark.parametrize(
+    ("a_val", "b_val"),
+    [(1.5, -4.0), (0.3, 2.0), (-2.0, 0.7)],
+)
+def test_backward_matches_finite_difference(a_val: float, b_val: float) -> None:
+    a, b = Node(a_val), Node(b_val)
+    loss = _loss(a, b)
+    assert isinstance(loss, Node)
+    loss.backward()
+
+    numeric_da = (_loss(a_val + H, b_val) - _loss(a_val - H, b_val)) / (2 * H)
+    numeric_db = (_loss(a_val, b_val + H) - _loss(a_val, b_val - H)) / (2 * H)
+
+    assert a.gradient == pytest.approx(numeric_da, abs=TOL)
+    assert b.gradient == pytest.approx(numeric_db, abs=TOL)

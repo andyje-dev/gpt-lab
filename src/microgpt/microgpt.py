@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from typing import Literal
 
 
 class Node:
@@ -70,3 +71,25 @@ class Node:
 
     def __rtruediv__(self, other: float | Node) -> Node:
         return other * self**-1
+
+    def _topological_order(self) -> list[Node]:
+        topological_order: list[Node] = []
+        visited: set[Node] = set()
+        stack: list[tuple[Node, Literal["expand", "append"]]] = [(self, "expand")]
+        while stack:
+            node, tag = stack.pop()
+            if tag == "append":
+                topological_order.append(node)
+            elif tag == "expand":
+                if node in visited:
+                    continue
+                visited.add(node)
+                stack.append((node, "append"))
+                for p in node.parents:
+                    stack.append((p, "expand"))
+        return topological_order
+
+    def backward(self):
+        self.gradient = 1.0
+        for n in reversed(self._topological_order()):
+            n.backward_func(n.gradient)
