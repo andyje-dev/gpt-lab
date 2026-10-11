@@ -140,6 +140,47 @@ Thus, each node that depends on a value must be processed before that value.
   (for example, a weight that is used two times) is in the list exactly one
   time.
 
+### Two jobs, two functions
+
+The backward pass has two jobs. The first job makes the ordered list. The
+second job walks the list and calls each local backward function with the
+gradient of its own node. We keep the two jobs in two functions. The first
+function does not touch a gradient slot. The second function does not look
+at a parent. The root sets its own gradient to `1.0` (`dL/dL`) one time,
+before the walk starts.
+
+### No recursion
+
+A recursive depth-first search is the natural way to write the first job.
+We do not use it. Each recursive call uses one frame on the Python call
+stack. Python stops at a fixed depth (1000 frames by default) and raises
+`RecursionError`. A GPT forward pass makes a graph that is thousands of
+nodes deep. A higher limit is not safe: the C stack under Python can
+overflow and end the process.
+
+Thus, we use a loop and our own stack (a plain list). The loop cannot pause
+in the middle of a node the way a recursive call can. To get the post-order,
+each node goes on the stack two times, with a tag:
+
+1. Push the root with the tag `expand`.
+2. Pop one entry. If the tag is `append`, add the node to the list. Go to
+   step 2.
+3. The tag is `expand`. If the node is in the visited set, drop it. Go to
+   step 2.
+4. Add the node to the visited set.
+5. Push the same node again with the tag `append`.
+6. Push each parent with the tag `expand`.
+7. Go to step 2.
+
+The stack is last-in, first-out. The parents go on after the `append` entry,
+so they come off before it. Each parent is fully processed before the
+`append` entry of the node comes back to the top. This reproduces the pause
+of the recursive version. The root is appended last.
+
+The sibling order can differ from the recursive version. This does not
+matter. Any order in which each node comes after all nodes that it depends
+on is correct.
+
 ## 7. Backprop does not touch forward values
 
 Each node has two numbers: the forward value and the gradient slot. Backprop
@@ -159,6 +200,17 @@ There are three stages:
 2. **Backward pass**: fill the gradient slots.
 3. **Optimizer step**: adjust the forward values of the weights with their
    gradient slots. Then set the gradient slots to zero for the next step.
+
+### Backprop does not zero the gradient slots
+
+The local backward functions use `+=`. They add to a gradient slot. They do
+not replace it. The backward pass does not clear the slots before the walk.
+Thus, a second call to `backward()` on the same graph adds the same
+contributions a second time.
+
+This is a decision. The optimizer owns the zeroing, as step 3 says. The
+backward pass does one job only: fill the slots from the graph as it is. A
+test holds this decision in place.
 
 ## 8. Which nodes are parameters
 
