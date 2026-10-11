@@ -6,6 +6,7 @@ dependencies = []
 
 [dependency-groups]
 dev = [
+    "lefthook>=2.2.1",
     "pytest>=9.0",
     "ruff>=0.17.0",
     "ty>=0.0.86",
@@ -17,4 +18,4 @@ build-backend = "uv_build"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = ["--import-mode=importlib"]
+addopts = ["--import-mode=importlib", "--strict-markers", "--strict-config"]

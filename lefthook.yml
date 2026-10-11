@@ -1,0 +1,18 @@
+# Git hooks managed by lefthook (https://lefthook.dev).
+# Install them with `make hooks` (also run as part of `make install`).
+
+pre-commit:
+  commands:
+    format:
+      run: make format
+      stage_fixed: true
+    lint:
+      run: make lint
+      stage_fixed: true
+    typecheck:
+      run: make typecheck
+
+pre-push:
+  commands:
+    test:
+      run: make test
