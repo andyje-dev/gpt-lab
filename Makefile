@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help check-uv install sync lock upgrade clean format format-check lint lint-fix typecheck validate run
+.PHONY: help check-uv install lock upgrade clean format lint typecheck test validate run
 
 help: ## Show the available commands
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -27,7 +27,7 @@ upgrade: check-uv ## Upgrade all dependencies to their latest allowed versions
 	uv sync --all-groups
 
 clean: ## Remove the virtualenv and cached build artifacts
-	rm -rf .venv .ruff_cache .ty_cache
+	rm -rf .venv .ruff_cache .ty_cache .pytest_cache
 	find . -type d -name __pycache__ -not -path './.venv/*' -exec rm -rf {} +
 
 # --- Code quality ------------------------------------------------------------
@@ -41,9 +41,12 @@ lint: check-uv ## Lint code with ruff
 typecheck: check-uv ## Type-check code with ty
 	uv run ty check
 
-validate: format lint typecheck ## Run format, lint, and typecheck
+test: check-uv ## Run the test suite with pytest
+	uv run pytest
+
+validate: format lint typecheck test ## Run format, lint, typecheck, and tests
 
 # --- Run ---------------------------------------------------------------------
 
 run: check-uv ## Run microgpt
-	uv run python microgpt.py
+	uv run python -m microgpt.microgpt
