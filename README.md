@@ -1,5 +1,18 @@
 # gpt-lab
 
+![Python 3.14](https://img.shields.io/badge/python-3.14-blue?logo=python&logoColor=white)
+[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![ty](https://img.shields.io/badge/type--checked-ty-261230)](https://github.com/astral-sh/ty)
+
+[![pytest](https://img.shields.io/badge/tested_with-pytest-0A9EDC?logo=pytest&logoColor=white)](https://docs.pytest.org/)
+[![lefthook](https://img.shields.io/badge/hooks-lefthook-FF1E1E)](https://github.com/evilmartians/lefthook)
+
+![Pure Python](https://img.shields.io/badge/pure-python-3776AB)
+![No dependencies](https://img.shields.io/badge/dependencies-none-success)
+
+[![Claude Code](https://img.shields.io/badge/built_with-Claude_Code-D97757?logo=claude&logoColor=white)](https://claude.com/claude-code)
+
 A GPT written from scratch in pure Python. No PyTorch, no NumPy. Each number
 in the model is a scalar node with its own gradient.
 
@@ -10,12 +23,6 @@ compare the results.
 
 The inspiration is Karpathy's `microgpt.py`. The code here is written by
 hand, and it will diverge as components are implemented and swapped.
-
-## Status
-
-| Module                     | State | Document                              |
-|----------------------------|-------|---------------------------------------|
-| `src/gptlab/autograd.py`   | done  | [docs/AUTOGRAD.md](docs/AUTOGRAD.md)  |
 
 ## Layout
 
