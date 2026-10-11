@@ -21,7 +21,7 @@ the base model works, the lab part starts: swap one transformer component at
 a time (for example, RoPE for learned positions, or Muon for AdamW) and
 compare the results.
 
-The inspiration is Karpathy's `microgpt.py`. The code here is written by
+The inspiration is Karpathy's [`microgpt.py`](https://gist.github.com/karpathy/8627fe009c40f57531cb18360106ce95). The code here is written by
 hand, and it will diverge as components are implemented and swapped.
 
 ## Layout
