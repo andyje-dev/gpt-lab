@@ -81,6 +81,17 @@ operation that made `c`.
 - `c` must keep a reference to each parent. `a` alone does not know the
   value of `b`.
 
+### Power: `c = a ** n`
+
+- `n` is a plain number, not a node. It is fixed during the forward pass.
+- `dc/da = n * a ** (n - 1)` (the power rule).
+- `c` sends `dL/dc * n * a ** (n - 1)` to `a`. There is one parent, so
+  there is one send.
+- `c` must keep a reference to `a` and must also keep the number `n`. `n` is
+  not a parent. It is not in the graph. The backward function must capture
+  it in some other way.
+- Example: `c = a ** 2` with `a = 3`. Then `dc/da = 2 * 3 = 6`.
+
 ### Where the derivative logic lives
 
 The computation occurs **at `c`**, not at the parents. `c` knows the
@@ -93,6 +104,12 @@ gradients of my parents." Addition makes one version of this function.
 Multiplication makes a different version. The generic backward pass calls
 these functions in the correct sequence. It does not have to know the
 operation of any node.
+
+The function takes one argument: the gradient of its own node. The backward
+pass reads that gradient from the node and passes it in. Thus, the function
+does not need a reference to the node that carries it. We can write the
+function before we make that node, and pass it to the constructor. A leaf
+carries a function that does nothing.
 
 Each new operation that the model needs (exponent, log, power, a
 nonlinearity, ...) is one more local derivative. We package each one in the
