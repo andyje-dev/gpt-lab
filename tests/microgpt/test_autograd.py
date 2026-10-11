@@ -7,7 +7,7 @@ import math
 
 import pytest
 
-from microgpt.microgpt import Node
+from microgpt.autograd import Node
 
 # --- Group 1: leaf construction (Section 2) ----------------------------------
 

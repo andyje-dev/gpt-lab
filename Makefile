@@ -53,4 +53,4 @@ validate: format lint typecheck test ## Run format, lint, typecheck, and tests
 # --- Run ---------------------------------------------------------------------
 
 run: check-uv ## Run microgpt
-	uv run python -m microgpt.microgpt
+	uv run python -m microgpt.train
