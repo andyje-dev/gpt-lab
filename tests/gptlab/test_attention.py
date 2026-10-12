@@ -17,29 +17,29 @@ from gptlab.autograd import Node
 from gptlab.layers import Matrix, Vector
 
 
-def _nodes(values: list[float]) -> Vector:
+def _nodes(*, values: list[float]) -> Vector:
     """Return one leaf Node for each float."""
-    return [Node(v) for v in values]
+    return [Node(forward_val=v) for v in values]
 
 
-def _matrix(values: list[list[float]]) -> Matrix:
+def _matrix(*, values: list[list[float]]) -> Matrix:
     """Return one leaf Node for each float, in rows."""
-    return [_nodes(row) for row in values]
+    return [_nodes(values=row) for row in values]
 
 
-def _values(nodes: Vector) -> list[float]:
+def _values(*, nodes: Vector) -> list[float]:
     """Return the forward value of each Node."""
     return [n.forward_val for n in nodes]
 
 
-def _random_floats(rng: random.Random, n: int) -> list[float]:
+def _random_floats(*, rng: random.Random, n: int) -> list[float]:
     """Return ``n`` floats drawn from a standard normal."""
     return [rng.gauss(0.0, 1.0) for _ in range(n)]
 
 
-def _random_matrix(rng: random.Random, n: int) -> list[list[float]]:
+def _random_matrix(*, rng: random.Random, n: int) -> list[list[float]]:
     """Return an ``n x n`` matrix of floats drawn from a standard normal."""
-    return [_random_floats(rng, n) for _ in range(n)]
+    return [_random_floats(rng=rng, n=n) for _ in range(n)]
 
 
 # --- Float reference ---------------------------------------------------------
@@ -49,12 +49,12 @@ def _random_matrix(rng: random.Random, n: int) -> list[list[float]]:
 # hand computation is too long, and the gradient check perturbs it.
 
 
-def _float_linear(x: list[float], w: list[list[float]]) -> list[float]:
+def _float_linear(*, x: list[float], w: list[list[float]]) -> list[float]:
     """Return the dot product of ``x`` with each row of ``w``."""
     return [sum(xi * wi for xi, wi in zip(x, row, strict=True)) for row in w]
 
 
-def _float_softmax(scores: list[float]) -> list[float]:
+def _float_softmax(*, scores: list[float]) -> list[float]:
     """Return the softmax of the scores, with no shift."""
     exps = [math.exp(s) for s in scores]
     total = sum(exps)
@@ -62,6 +62,7 @@ def _float_softmax(scores: list[float]) -> list[float]:
 
 
 def _float_attend(
+    *,
     q: list[float],
     keys: list[list[float]],
     values: list[list[float]],
@@ -69,7 +70,7 @@ def _float_attend(
 ) -> list[float]:
     """Return one query's weighted sum of the values, with floats only."""
     scores = [sum(a * b for a, b in zip(q, key, strict=True)) * scale for key in keys]
-    weights = _float_softmax(scores)
+    weights = _float_softmax(scores=scores)
     return [
         sum(w * value[t] for w, value in zip(weights, values, strict=True))
         for t in range(len(values[0]))
@@ -77,6 +78,7 @@ def _float_attend(
 
 
 def _float_attention(
+    *,
     x: list[list[float]],
     wq: list[list[float]],
     wk: list[list[float]],
@@ -87,9 +89,9 @@ def _float_attention(
     """Return causal multi-head self-attention over ``x``, with floats only."""
     n_embd = len(x[0])
     head_dim = n_embd // n_head
-    q = [_float_linear(xi, wq) for xi in x]
-    k = [_float_linear(xi, wk) for xi in x]
-    v = [_float_linear(xi, wv) for xi in x]
+    q = [_float_linear(x=xi, w=wq) for xi in x]
+    k = [_float_linear(x=xi, w=wk) for xi in x]
+    v = [_float_linear(x=xi, w=wv) for xi in x]
 
     outputs = []
     for i in range(len(x)):
@@ -101,12 +103,12 @@ def _float_attention(
                 / math.sqrt(head_dim)
                 for j in range(i + 1)
             ]
-            weights = _float_softmax(scores)
+            weights = _float_softmax(scores=scores)
             heads += [
                 sum(weights[j] * v[j][lo + t] for j in range(i + 1))
                 for t in range(head_dim)
             ]
-        outputs.append(_float_linear(heads, wo))
+        outputs.append(_float_linear(x=heads, w=wo))
     return outputs
 
 
@@ -120,22 +122,22 @@ N_HEAD = 2
 T = 3
 
 
-def _case(seed: int = 0):
+def _case(*, seed: int = 0):
     """Return (x, wq, wk, wv, wo) as floats for the shared small case."""
     rng = random.Random(seed)
-    x = [_random_floats(rng, N_EMBD) for _ in range(T)]
-    wq, wk, wv, wo = (_random_matrix(rng, N_EMBD) for _ in range(4))
+    x = [_random_floats(rng=rng, n=N_EMBD) for _ in range(T)]
+    wq, wk, wv, wo = (_random_matrix(rng=rng, n=N_EMBD) for _ in range(4))
     return x, wq, wk, wv, wo
 
 
-def _run(x, wq, wk, wv, wo, n_head: int = N_HEAD) -> Matrix:
+def _run(*, x, wq, wk, wv, wo, n_head: int = N_HEAD) -> Matrix:
     """Build Nodes from the floats and run the module under test."""
     return attention(
-        [_nodes(xi) for xi in x],
-        _matrix(wq),
-        _matrix(wk),
-        _matrix(wv),
-        _matrix(wo),
+        x=[_nodes(values=xi) for xi in x],
+        wq=_matrix(values=wq),
+        wk=_matrix(values=wk),
+        wv=_matrix(values=wv),
+        wo=_matrix(values=wo),
         n_head=n_head,
     )
 
@@ -150,9 +152,14 @@ K_VALS = [[1.0, 0.0], [0.0, 1.0], [-1.0, 0.0]]
 V_VALS = [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]
 
 
-def _attend(q, keys, values, scale: float = 1.0) -> Vector:
+def _attend(*, q, keys, values, scale: float = 1.0) -> Vector:
     """Build Nodes from the floats and run ``attend``."""
-    return attend(_nodes(q), _matrix(keys), _matrix(values), scale)
+    return attend(
+        q=_nodes(values=q),
+        keys=_matrix(values=keys),
+        values=_matrix(values=values),
+        scale=scale,
+    )
 
 
 def test_attend_matches_hand_computed_case() -> None:
@@ -164,49 +171,52 @@ def test_attend_matches_hand_computed_case() -> None:
         w[0] * 1.0 + w[1] * 3.0 + w[2] * 5.0,
         w[0] * 2.0 + w[1] * 4.0 + w[2] * 6.0,
     ]
-    assert _values(_attend(Q_VALS, K_VALS, V_VALS)) == pytest.approx(expected)
+    out = _attend(q=Q_VALS, keys=K_VALS, values=V_VALS)
+    assert _values(nodes=out) == pytest.approx(expected)
 
 
 def test_attend_matches_float_reference() -> None:
     rng = random.Random(3)
-    q = _random_floats(rng, 2)
-    keys = [_random_floats(rng, 2) for _ in range(4)]
-    values = [_random_floats(rng, 2) for _ in range(4)]
+    q = _random_floats(rng=rng, n=2)
+    keys = [_random_floats(rng=rng, n=2) for _ in range(4)]
+    values = [_random_floats(rng=rng, n=2) for _ in range(4)]
     scale = 2**-0.5
-    out = _attend(q, keys, values, scale)
-    assert _values(out) == pytest.approx(_float_attend(q, keys, values, scale))
+    out = _attend(q=q, keys=keys, values=values, scale=scale)
+    expected = _float_attend(q=q, keys=keys, values=values, scale=scale)
+    assert _values(nodes=out) == pytest.approx(expected)
 
 
 def test_attend_output_length_is_value_width() -> None:
-    assert len(_attend(Q_VALS, K_VALS, V_VALS)) == 2
+    assert len(_attend(q=Q_VALS, keys=K_VALS, values=V_VALS)) == 2
 
 
 def test_attend_returns_nodes() -> None:
-    assert all(isinstance(y, Node) for y in _attend(Q_VALS, K_VALS, V_VALS))
+    out = _attend(q=Q_VALS, keys=K_VALS, values=V_VALS)
+    assert all(isinstance(y, Node) for y in out)
 
 
 def test_attend_with_one_key_returns_its_value() -> None:
     # Softmax of one score is exactly 1, so the output is the one value.
-    out = _attend(Q_VALS, K_VALS[:1], V_VALS[:1])
-    assert _values(out) == V_VALS[0]
+    out = _attend(q=Q_VALS, keys=K_VALS[:1], values=V_VALS[:1])
+    assert _values(nodes=out) == V_VALS[0]
 
 
 def test_attend_scale_changes_the_weights() -> None:
     # A larger scale sharpens the softmax, so the best-matching key, the
     # first one, pulls the output closer to its value.
-    soft = _values(_attend(Q_VALS, K_VALS, V_VALS, scale=0.1))
-    sharp = _values(_attend(Q_VALS, K_VALS, V_VALS, scale=10.0))
+    soft = _values(nodes=_attend(q=Q_VALS, keys=K_VALS, values=V_VALS, scale=0.1))
+    sharp = _values(nodes=_attend(q=Q_VALS, keys=K_VALS, values=V_VALS, scale=10.0))
     assert abs(sharp[0] - V_VALS[0][0]) < abs(soft[0] - V_VALS[0][0])
 
 
 def test_attend_rejects_a_key_of_the_wrong_length() -> None:
     with pytest.raises(ValueError):
-        _attend(Q_VALS, [[1.0, 0.0, 0.0]], V_VALS[:1])
+        _attend(q=Q_VALS, keys=[[1.0, 0.0, 0.0]], values=V_VALS[:1])
 
 
 def test_attend_rejects_unequal_key_and_value_counts() -> None:
     with pytest.raises(ValueError):
-        _attend(Q_VALS, K_VALS, V_VALS[:2])
+        _attend(q=Q_VALS, keys=K_VALS, values=V_VALS[:2])
 
 
 # --- Group 2: split_heads (Section 3) ----------------------------------------
@@ -218,12 +228,12 @@ HEAD_VALS = [[[1.0, 2.0], [5.0, 6.0]], [[3.0, 4.0], [7.0, 8.0]]]
 
 
 def test_split_heads_matches_hand_computed_case() -> None:
-    heads = split_heads(_matrix(M_VALS), n_head=2)
-    assert [[_values(row) for row in head] for head in heads] == HEAD_VALS
+    heads = split_heads(m=_matrix(values=M_VALS), n_head=2)
+    assert [[_values(nodes=row) for row in head] for head in heads] == HEAD_VALS
 
 
 def test_split_heads_shape_is_heads_by_rows_by_head_dim() -> None:
-    heads = split_heads(_matrix(M_VALS), n_head=2)
+    heads = split_heads(m=_matrix(values=M_VALS), n_head=2)
     assert len(heads) == 2
     assert all(len(head) == 2 for head in heads)
     assert all(len(row) == 2 for head in heads for row in head)
@@ -231,8 +241,8 @@ def test_split_heads_shape_is_heads_by_rows_by_head_dim() -> None:
 
 def test_split_heads_makes_no_node() -> None:
     # Section 3: a slice holds the same node objects as the row it came from.
-    m = _matrix(M_VALS)
-    heads = split_heads(m, n_head=2)
+    m = _matrix(values=M_VALS)
+    heads = split_heads(m=m, n_head=2)
     for h, head in enumerate(heads):
         for r, row in enumerate(head):
             for t, node in enumerate(row):
@@ -240,8 +250,8 @@ def test_split_heads_makes_no_node() -> None:
 
 
 def test_split_heads_with_one_head_is_the_whole_matrix() -> None:
-    m = _matrix(M_VALS)
-    (head,) = split_heads(m, n_head=1)
+    m = _matrix(values=M_VALS)
+    (head,) = split_heads(m=m, n_head=1)
     assert head == m
 
 
@@ -249,32 +259,36 @@ def test_split_heads_with_one_head_is_the_whole_matrix() -> None:
 
 
 def test_output_has_one_vector_per_position() -> None:
-    out = _run(*_case())
+    x, wq, wk, wv, wo = _case()
+    out = _run(x=x, wq=wq, wk=wk, wv=wv, wo=wo)
     assert len(out) == T
 
 
 def test_each_output_vector_has_length_n_embd() -> None:
-    out = _run(*_case())
+    x, wq, wk, wv, wo = _case()
+    out = _run(x=x, wq=wq, wk=wk, wv=wv, wo=wo)
     assert all(len(y) == N_EMBD for y in out)
 
 
 def test_output_holds_nodes() -> None:
-    out = _run(*_case())
+    x, wq, wk, wv, wo = _case()
+    out = _run(x=x, wq=wq, wk=wk, wv=wv, wo=wo)
     assert all(isinstance(yi, Node) for y in out for yi in y)
 
 
 def test_forward_matches_float_reference() -> None:
     x, wq, wk, wv, wo = _case()
-    expected = _float_attention(x, wq, wk, wv, wo, N_HEAD)
-    out = _run(x, wq, wk, wv, wo)
+    expected = _float_attention(x=x, wq=wq, wk=wk, wv=wv, wo=wo, n_head=N_HEAD)
+    out = _run(x=x, wq=wq, wk=wk, wv=wv, wo=wo)
     for y, e in zip(out, expected, strict=True):
-        assert _values(y) == pytest.approx(e)
+        assert _values(nodes=y) == pytest.approx(e)
 
 
 def test_n_head_must_divide_n_embd() -> None:
     # n_embd = 4. 3 heads would give head_dim = 1 and drop one dimension.
+    x, wq, wk, wv, wo = _case()
     with pytest.raises(ValueError):
-        _run(*_case(), n_head=3)
+        _run(x=x, wq=wq, wk=wk, wv=wv, wo=wo, n_head=3)
 
 
 # --- Group 4: one position (Section 6) ---------------------------------------
@@ -286,16 +300,17 @@ def test_n_head_must_divide_n_embd() -> None:
 
 def test_one_position_is_wo_of_wv_of_x() -> None:
     x, wq, wk, wv, wo = _case()
-    (y,) = _run(x[:1], wq, wk, wv, wo)
-    assert _values(y) == pytest.approx(_float_linear(_float_linear(x[0], wv), wo))
+    (y,) = _run(x=x[:1], wq=wq, wk=wk, wv=wv, wo=wo)
+    expected = _float_linear(x=_float_linear(x=x[0], w=wv), w=wo)
+    assert _values(nodes=y) == pytest.approx(expected)
 
 
 def test_one_position_ignores_wq_and_wk() -> None:
     x, wq, wk, wv, wo = _case()
     _, wq2, wk2, _, _ = _case(seed=1)
-    (y,) = _run(x[:1], wq, wk, wv, wo)
-    (y2,) = _run(x[:1], wq2, wk2, wv, wo)
-    assert _values(y) == pytest.approx(_values(y2))
+    (y,) = _run(x=x[:1], wq=wq, wk=wk, wv=wv, wo=wo)
+    (y2,) = _run(x=x[:1], wq=wq2, wk=wk2, wv=wv, wo=wo)
+    assert _values(nodes=y) == pytest.approx(_values(nodes=y2))
 
 
 # --- Group 5: causality (Section 5) ------------------------------------------
@@ -309,12 +324,12 @@ def test_a_later_position_does_not_change_earlier_outputs() -> None:
     changed = [row[:] for row in x]
     changed[2] = [v + 1.0 for v in changed[2]]
 
-    base = _run(x, wq, wk, wv, wo)
-    out = _run(changed, wq, wk, wv, wo)
+    base = _run(x=x, wq=wq, wk=wk, wv=wv, wo=wo)
+    out = _run(x=changed, wq=wq, wk=wk, wv=wv, wo=wo)
 
-    assert _values(out[0]) == _values(base[0])
-    assert _values(out[1]) == _values(base[1])
-    assert _values(out[2]) != pytest.approx(_values(base[2]))
+    assert _values(nodes=out[0]) == _values(nodes=base[0])
+    assert _values(nodes=out[1]) == _values(nodes=base[1])
+    assert _values(nodes=out[2]) != pytest.approx(_values(nodes=base[2]))
 
 
 def test_an_earlier_position_does_change_later_outputs() -> None:
@@ -322,11 +337,11 @@ def test_an_earlier_position_does_change_later_outputs() -> None:
     changed = [row[:] for row in x]
     changed[0] = [v + 1.0 for v in changed[0]]
 
-    base = _run(x, wq, wk, wv, wo)
-    out = _run(changed, wq, wk, wv, wo)
+    base = _run(x=x, wq=wq, wk=wk, wv=wv, wo=wo)
+    out = _run(x=changed, wq=wq, wk=wk, wv=wv, wo=wo)
 
-    assert _values(out[1]) != pytest.approx(_values(base[1]))
-    assert _values(out[2]) != pytest.approx(_values(base[2]))
+    assert _values(nodes=out[1]) != pytest.approx(_values(nodes=base[1]))
+    assert _values(nodes=out[2]) != pytest.approx(_values(nodes=base[2]))
 
 
 # --- Group 6: numeric gradient check (Section 7) -----------------------------
@@ -345,7 +360,7 @@ GRAD_T = 2
 COEFFS = [0.3, -1.2, 2.0, 0.7, -0.4, 1.5, 0.9, -2.1]
 
 
-def _unpack(v: list, t: int = GRAD_T, n: int = N_EMBD):
+def _unpack(*, v: list, t: int = GRAD_T, n: int = N_EMBD):
     """Split one flat list into (x, wq, wk, wv, wo)."""
     x = [v[i * n : (i + 1) * n] for i in range(t)]
     mats = []
@@ -356,7 +371,7 @@ def _unpack(v: list, t: int = GRAD_T, n: int = N_EMBD):
     return x, *mats
 
 
-def _weighted(outputs: list[list], coeffs: list[float]):
+def _weighted(*, outputs: list[list], coeffs: list[float]):
     """Return the weighted sum of every element of the outputs."""
     flat = [o for row in outputs for o in row]
     total = flat[0] * coeffs[0]
@@ -365,30 +380,32 @@ def _weighted(outputs: list[list], coeffs: list[float]):
     return total
 
 
-def _node_loss(v: Vector) -> Node:
+def _node_loss(*, v: Vector) -> Node:
     """Return the weighted loss of the module under test."""
-    x, wq, wk, wv, wo = _unpack(v)
-    return _weighted(attention(x, wq, wk, wv, wo, n_head=N_HEAD), COEFFS)
+    x, wq, wk, wv, wo = _unpack(v=v)
+    out = attention(x=x, wq=wq, wk=wk, wv=wv, wo=wo, n_head=N_HEAD)
+    return _weighted(outputs=out, coeffs=COEFFS)
 
 
-def _float_loss(v: list[float]) -> float:
+def _float_loss(*, v: list[float]) -> float:
     """Return the same loss as ``_node_loss`` with floats only."""
-    x, wq, wk, wv, wo = _unpack(v)
-    return _weighted(_float_attention(x, wq, wk, wv, wo, N_HEAD), COEFFS)
+    x, wq, wk, wv, wo = _unpack(v=v)
+    out = _float_attention(x=x, wq=wq, wk=wk, wv=wv, wo=wo, n_head=N_HEAD)
+    return _weighted(outputs=out, coeffs=COEFFS)
 
 
 def test_backward_matches_finite_difference() -> None:
     rng = random.Random(2)
-    inputs = _random_floats(rng, GRAD_T * N_EMBD + 4 * N_EMBD * N_EMBD)
+    inputs = _random_floats(rng=rng, n=GRAD_T * N_EMBD + 4 * N_EMBD * N_EMBD)
 
-    nodes = _nodes(inputs)
-    loss = _node_loss(nodes)
+    nodes = _nodes(values=inputs)
+    loss = _node_loss(v=nodes)
     assert isinstance(loss, Node)
-    assert loss.forward_val == pytest.approx(_float_loss(inputs))
+    assert loss.forward_val == pytest.approx(_float_loss(v=inputs))
     loss.backward()
 
     for i, node in enumerate(nodes):
         up = inputs[:i] + [inputs[i] + H] + inputs[i + 1 :]
         down = inputs[:i] + [inputs[i] - H] + inputs[i + 1 :]
-        numeric = (_float_loss(up) - _float_loss(down)) / (2 * H)
+        numeric = (_float_loss(v=up) - _float_loss(v=down)) / (2 * H)
         assert node.gradient == pytest.approx(numeric, abs=TOL), f"input {i}"

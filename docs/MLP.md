@@ -59,9 +59,9 @@ name of the vector says what it is.
 
 | Stage    | Line                                           | Length     |
 |----------|------------------------------------------------|------------|
-| Expand   | `pre_activations = linear(x, fc1)`             | `n_hidden` |
+| Expand   | `pre_activations = linear(x=x, w=fc1)`         | `n_hidden` |
 | Cut      | `hidden = [p.relu() for p in pre_activations]` | `n_hidden` |
-| Contract | `outputs = linear(hidden, fc2)`                | `n_embd`   |
+| Contract | `outputs = linear(x=hidden, w=fc2)`            | `n_embd`   |
 
 `n_hidden` is the width of the hidden vector. It is not an argument of
 `mlp` and the function never reads it. The caller sets it by the number of
@@ -74,7 +74,7 @@ rows it gives `fc1`.
 element touches every output element. The number says which map comes
 first.
 
-`linear(x, w)`, from section 4 of `docs/LAYERS.md`, returns one dot product
+`linear(x=x, w=w)`, from section 4 of `docs/LAYERS.md`, returns one dot product
 per row of `w`. So the row count of a matrix sets the output length, and
 the row length must match the input:
 

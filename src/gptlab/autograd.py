@@ -31,6 +31,7 @@ class Node:
 
     def __init__(
         self,
+        *,
         forward_val: float,
         children: tuple[Node, ...] = (),
         propagate: Callable[[float], None] = lambda g: None,
@@ -64,7 +65,7 @@ class Node:
             A new Node with both operands as children. In the backward pass,
             each operand receives the incoming gradient with no change.
         """
-        other = other if isinstance(other, Node) else Node(other)
+        other = other if isinstance(other, Node) else Node(forward_val=other)
 
         def propagate(g: float) -> None:
             self.gradient += g
@@ -87,7 +88,7 @@ class Node:
             each operand receives the incoming gradient times the forward
             value of the other operand.
         """
-        other = other if isinstance(other, Node) else Node(other)
+        other = other if isinstance(other, Node) else Node(forward_val=other)
 
         def propagate(g: float) -> None:
             self.gradient += g * other.forward_val

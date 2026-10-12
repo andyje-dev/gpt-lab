@@ -13,7 +13,7 @@ docs/MLP.md.
 from gptlab.layers import Matrix, Vector, linear
 
 
-def mlp(x: Vector, fc1: Matrix, fc2: Matrix) -> Vector:
+def mlp(*, x: Vector, fc1: Matrix, fc2: Matrix) -> Vector:
     """Return ``fc2 @ relu(fc1 @ x)`` for one position.
 
     The hidden vector has one node per row of ``fc1``, so the caller sets
@@ -40,8 +40,8 @@ def mlp(x: Vector, fc1: Matrix, fc2: Matrix) -> Vector:
             ``x``, or if a row of ``fc2`` does not have the same length as
             the hidden vector.
     """
-    pre_activations: Vector = linear(x, fc1)
+    pre_activations: Vector = linear(x=x, w=fc1)
     hidden: Vector = [pre_activation.relu() for pre_activation in pre_activations]
-    outputs: Vector = linear(hidden, fc2)
+    outputs: Vector = linear(x=hidden, w=fc2)
 
     return outputs

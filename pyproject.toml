@@ -22,3 +22,18 @@ build-backend = "uv_build"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = ["--import-mode=importlib", "--strict-markers", "--strict-config"]
+
+[tool.ruff.lint]
+preview = true
+explicit-preview-rules = true
+extend-select = ["PLR0917"]
+
+[tool.ruff.lint.pylint]
+# Every parameter is keyword-only. A function definition with a positional
+# parameter fails lint. See CLAUDE.md section 4.
+max-positional-args = 0
+
+[tool.ruff.lint.per-file-ignores]
+# Python calls the operator methods (__add__, __mul__, ...) and the propagate
+# closures positionally, so this file cannot comply everywhere.
+"src/gptlab/autograd.py" = ["PLR0917"]

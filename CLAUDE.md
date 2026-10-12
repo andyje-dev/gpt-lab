@@ -130,6 +130,20 @@ Conventions to follow through out the code.
   `weights`, `squares`, `pre_activations`, `outputs`. The loop variable is
   the singular of the list: `exponential` in `exponentials`. Not the type. 
 - Every local variable has a type hint.
+- Every parameter is keyword-only. A bare `*` opens each parameter list:
+  `def mlp(*, x: Vector, fc1: Matrix, fc2: Matrix)`. So every call names
+  each argument: `mlp(x=x, fc1=fc1, fc2=fc2)`, `Node(forward_val=3.0)`,
+  `_nodes(values=X_VALS)` in a test. No `*` unpacking into a call. This
+  holds for the `gptlab` functions, `Node.__init__`, the test helpers, and
+  the test functions. Ruff rule `PLR0917` with `max-positional-args = 0`
+  in `pyproject.toml` fails any definition that forgets the `*`. The
+  exceptions are the calls Python makes positionally: builtins and library
+  functions (`zip`, `len`, `range`, `math.exp`, `pytest.approx`), the
+  operator methods (`__add__`), a closure that Python calls through an
+  attribute (`propagate(g)`), and a `*args` parameter (`_seeded(a, b)`).
+  `autograd.py` is excluded from the rule for the operator methods and
+  the closures, but `Node.__init__` still has the `*`. A closure in a test
+  that stands in for `propagate` carries `# noqa: PLR0917`.
 - No shape check where a strict `zip` already raises `ValueError`. A guard
   is added only where the error message can say more than `zip` can, as
   the `n_head` guard in `attention` does.

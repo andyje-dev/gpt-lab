@@ -12,7 +12,7 @@ Vector = list[Node]
 Matrix = list[Vector]
 
 
-def dot(x: Vector, y: Vector) -> Node:
+def dot(*, x: Vector, y: Vector) -> Node:
     """Return the dot product of ``x`` and ``y``.
 
     The graph is one product per element and a chain of sums seeded from the
@@ -35,7 +35,7 @@ def dot(x: Vector, y: Vector) -> Node:
     return dot_product
 
 
-def linear(x: Vector, w: Matrix) -> Vector:
+def linear(*, x: Vector, w: Matrix) -> Vector:
     """Return the dot product of ``x`` with each row of ``w``.
 
     Each output is one call of ``dot``. There is no bias term.
@@ -50,12 +50,12 @@ def linear(x: Vector, w: Matrix) -> Vector:
     Raises:
         ValueError: If a row of ``w`` does not have the same length as ``x``.
     """
-    outputs: Vector = [dot(x, row) for row in w]
+    outputs: Vector = [dot(x=x, y=row) for row in w]
 
     return outputs
 
 
-def softmax(logits: Vector) -> Vector:
+def softmax(*, logits: Vector) -> Vector:
     """Return a probability distribution over the logits.
 
     The function subtracts the largest logit as a plain float before it
@@ -83,7 +83,7 @@ def softmax(logits: Vector) -> Vector:
     return probabilities
 
 
-def rmsnorm(x: Vector, eps: float = 1e-5) -> Vector:
+def rmsnorm(*, x: Vector, eps: float = 1e-5) -> Vector:
     """Divide each element of ``x`` by the root-mean-square of ``x``.
 
     There is no learned scale. The ``eps`` term is inside the root. A zero
@@ -113,7 +113,7 @@ def rmsnorm(x: Vector, eps: float = 1e-5) -> Vector:
     return outputs
 
 
-def transpose(m: Matrix) -> Matrix:
+def transpose(*, m: Matrix) -> Matrix:
     """Return ``m`` with its rows and columns swapped.
 
     Element ``[r][c]`` of the result is element ``[c][r]`` of ``m``. The

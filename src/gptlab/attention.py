@@ -12,10 +12,10 @@ choice are in docs/ATTENTION.md.
 from gptlab.layers import Matrix, Vector, dot, linear, softmax, transpose
 
 
-def attend(q: Vector, keys: Matrix, values: Matrix, scale: float) -> Vector:
+def attend(*, q: Vector, keys: Matrix, values: Matrix, scale: float) -> Vector:
     """Return the weighted sum of ``values``, weighted by how ``q`` scores each key.
 
-    The score of key ``j`` is ``dot(q, keys[j]) * scale``. The weights are the
+    The score of key ``j`` is ``dot(x=q, y=keys[j]) * scale``. The weights are the
     softmax of the scores. The function does not know about positions, heads,
     or the causal rule. The caller chooses which keys and values to pass.
 
@@ -33,13 +33,13 @@ def attend(q: Vector, keys: Matrix, values: Matrix, scale: float) -> Vector:
         ValueError: If a key does not have the same length as ``q``, or if
             ``keys`` and ``values`` do not have the same number of rows.
     """
-    scores: Vector = [dot(q, key) * scale for key in keys]
-    weights: Vector = softmax(scores)
+    scores: Vector = [dot(x=q, y=key) * scale for key in keys]
+    weights: Vector = softmax(logits=scores)
 
-    return linear(weights, transpose(values))
+    return linear(x=weights, w=transpose(m=values))
 
 
-def split_heads(m: Matrix, n_head: int) -> list[Matrix]:
+def split_heads(*, m: Matrix, n_head: int) -> list[Matrix]:
     """Return ``m`` cut into ``n_head`` matrices, one per head.
 
     Head ``h`` holds elements ``h * head_dim`` to ``(h + 1) * head_dim - 1``
@@ -63,6 +63,7 @@ def split_heads(m: Matrix, n_head: int) -> list[Matrix]:
 
 
 def attention(
+    *,
     x: Matrix,
     wq: Matrix,
     wk: Matrix,
@@ -92,15 +93,17 @@ def attention(
     head_dim: int = n_embd // n_head
     scale: float = head_dim**-0.5
 
-    q: list[Matrix] = split_heads([linear(xi, wq) for xi in x], n_head)
-    k: list[Matrix] = split_heads([linear(xi, wk) for xi in x], n_head)
-    v: list[Matrix] = split_heads([linear(xi, wv) for xi in x], n_head)
+    q: list[Matrix] = split_heads(m=[linear(x=xi, w=wq) for xi in x], n_head=n_head)
+    k: list[Matrix] = split_heads(m=[linear(x=xi, w=wk) for xi in x], n_head=n_head)
+    v: list[Matrix] = split_heads(m=[linear(x=xi, w=wv) for xi in x], n_head=n_head)
 
     outputs: Matrix = []
     for i in range(len(x)):
         joined: Vector = []
         for h in range(n_head):
-            joined.extend(attend(q[h][i], k[h][: i + 1], v[h][: i + 1], scale))
-        outputs.append(linear(joined, wo))
+            joined.extend(
+                attend(q=q[h][i], keys=k[h][: i + 1], values=v[h][: i + 1], scale=scale)
+            )
+        outputs.append(linear(x=joined, w=wo))
 
     return outputs

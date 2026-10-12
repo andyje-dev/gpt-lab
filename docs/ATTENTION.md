@@ -86,7 +86,7 @@ lines, one per stage.
 The score of key `j` is:
 
 ```
-score[j] = dot(q, keys[j]) * scale
+score[j] = dot(x=q, y=keys[j]) * scale
 ```
 
 `dot` is the function of section 3 of `docs/LAYERS.md`.
@@ -107,7 +107,7 @@ caller does. Section 4 says where the float comes from.
 
 ### The weights
 
-`softmax(scores)` turns the `n` scores into `n` weights. Each weight is
+`softmax(logits=scores)` turns the `n` scores into `n` weights. Each weight is
 between zero and one, and the weights sum to one. Weight `j` is how much the
 query reads from position `j`.
 
@@ -124,8 +124,8 @@ out[t] = weights[0] * values[0][t] + weights[1] * values[1][t] + ...
 
 This is a weighted sum across **positions**, one for each element.
 `linear` sums across the elements of one row. The rows of `values` are
-positions, so they point in the wrong direction. `transpose(values)` turns
-them, and `linear(weights, transpose(values))` is then the sum above.
+positions, so they point in the wrong direction. `transpose(m=values)` turns
+them, and `linear(x=weights, w=transpose(m=values))` is then the sum above.
 Section 7 of `docs/LAYERS.md` gives the same argument from the other side.
 
 ### What `attend` does not know
@@ -181,9 +181,9 @@ size when it makes them.
 
 `linear` projects each position three times:
 
-- `linear(x[i], wq)` is the query of position `i`.
-- `linear(x[j], wk)` is the key of position `j`.
-- `linear(x[j], wv)` is the value of position `j`.
+- `linear(x=x[i], w=wq)` is the query of position `i`.
+- `linear(x=x[j], w=wk)` is the key of position `j`.
+- `linear(x=x[j], w=wv)` is the value of position `j`.
 
 Three weight matrices let the model learn a query that is not the same as
 the key of the same position. One matrix would give the same vector three
@@ -216,7 +216,7 @@ Section 2 says why.
 For position `i` and head `h`, the code calls:
 
 ```
-attend(q[h][i], k[h][: i + 1], v[h][: i + 1], scale)
+attend(q=q[h][i], keys=k[h][: i + 1], values=v[h][: i + 1], scale=scale)
 ```
 
 The slice `[: i + 1]` holds positions `0` to `i`. At `i = 0` it holds one
@@ -240,7 +240,7 @@ position 0.
 
 ## 6. Join and output projection
 
-> Code: `joined.extend(...)`, `linear(joined, wo)`
+> Code: `joined.extend(...)`, `linear(x=joined, w=wo)`
 > Tests: group 3 (shape) and group 4 (one position)
 
 ### The join
@@ -256,7 +256,7 @@ different things. `extend` can only mean the list operation.
 ### The output projection
 
 The heads are independent. No node in `joined` mixes head 0 with head 1.
-`linear(joined, wo)` mixes them. Each output element is a weighted sum of
+`linear(x=joined, w=wo)` mixes them. Each output element is a weighted sum of
 all `n_embd` elements of `joined`, across every head. The model learns in
 `wo` how to combine what the heads found. In the backward pass, `wo` is
 also where the gradient from the next layer splits and flows back into

@@ -187,7 +187,7 @@ A linear layer multiplies a vector by a matrix. Output `i` is the dot
 product of `x` with row `i` of `w`:
 
 ```
-y[i] = dot(x, w[i])
+y[i] = dot(x=x, y=w[i])
 ```
 
 The code is one comprehension over the rows of `w`. There is one output per
@@ -254,7 +254,7 @@ Thus:
   parameter, it is not returned, and the next forward pass makes a new
   shift from the new logits. The shift is **free**.
 
-This leaf is not the same waste as the `Node(0)` of section 3. That zero
+This leaf is not the same waste as the `Node(forward_val=0)` of section 3. That zero
 was never part of the dot product. It came from how builtin `sum` starts,
 and a different loop removed it. The shift is part of the formula that the
 code computes. The node class combines nodes with nodes, so a float operand
@@ -372,7 +372,7 @@ weighted sum over the positions.
 
 The rows are in the wrong direction for `linear`. A transpose turns them in
 the correct direction. The weighted sum is then
-`linear(weights, transpose(values))`. Section 2 of `docs/ATTENTION.md`
+`linear(x=weights, w=transpose(m=values))`. Section 2 of `docs/ATTENTION.md`
 gives the full argument.
 
 ### The guard

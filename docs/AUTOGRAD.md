@@ -206,7 +206,7 @@ the output node will write to `other.gradient`. This fails on a float.
 Thus, the first line of each binary primitive wraps the float:
 
 ```python
-other = other if isinstance(other, Node) else Node(other)
+other = other if isinstance(other, Node) else Node(forward_val=other)
 ```
 
 The wrapped float is a **leaf**. It has no children. It gets a gradient slot
