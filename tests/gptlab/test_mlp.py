@@ -53,9 +53,7 @@ def _float_linear(*, x: list[float], w: list[list[float]]) -> list[float]:
     return [sum(xi * wi for xi, wi in zip(x, row, strict=True)) for row in w]
 
 
-def _float_mlp(
-    *, x: list[float], fc1: list[list[float]], fc2: list[list[float]]
-) -> list[float]:
+def _float_mlp(*, x: list[float], fc1: list[list[float]], fc2: list[list[float]]) -> list[float]:
     """Return ``fc2 @ relu(fc1 @ x)`` with floats only."""
     hidden = [max(0.0, h) for h in _float_linear(x=x, w=fc1)]
     return _float_linear(x=hidden, w=fc2)
@@ -232,9 +230,7 @@ def _float_loss(*, v: list[float]) -> float:
 
 def test_backward_matches_finite_difference() -> None:
     rng = random.Random(2)
-    inputs = _random_floats(
-        rng=rng, n=N_EMBD + 4 * N_EMBD * N_EMBD + N_EMBD * 4 * N_EMBD
-    )
+    inputs = _random_floats(rng=rng, n=N_EMBD + 4 * N_EMBD * N_EMBD + N_EMBD * 4 * N_EMBD)
 
     x, fc1, _ = _unpack(v=inputs)
     assert all(abs(h) > KINK_MARGIN for h in _float_linear(x=x, w=fc1))

@@ -23,6 +23,10 @@ build-backend = "uv_build"
 testpaths = ["tests"]
 addopts = ["--import-mode=importlib", "--strict-markers", "--strict-config"]
 
+[tool.ruff]
+# 110 columns so that an update equation with noun names fits on one line.
+line-length = 110
+
 [tool.ruff.lint]
 preview = true
 explicit-preview-rules = true

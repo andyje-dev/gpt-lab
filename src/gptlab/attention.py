@@ -62,9 +62,7 @@ def split_heads(*, m: Matrix, n_head: int) -> list[Matrix]:
         raise ValueError("m is empty")
     head_dim: int = len(m[0]) // n_head
 
-    return [
-        [row[h * head_dim : (h + 1) * head_dim] for row in m] for h in range(n_head)
-    ]
+    return [[row[h * head_dim : (h + 1) * head_dim] for row in m] for h in range(n_head)]
 
 
 def attention(
@@ -109,9 +107,7 @@ def attention(
     for i in range(len(x)):
         joined: Vector = []
         for h in range(n_head):
-            joined.extend(
-                attend(q=q[h][i], keys=k[h][: i + 1], values=v[h][: i + 1], scale=scale)
-            )
+            joined.extend(attend(q=q[h][i], keys=k[h][: i + 1], values=v[h][: i + 1], scale=scale))
         outputs.append(linear(x=joined, w=wo))
 
     return outputs

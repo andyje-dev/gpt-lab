@@ -55,9 +55,7 @@ class Config:
             ValueError: If ``n_head`` does not divide ``n_embd``.
         """
         if self.n_embd % self.n_head != 0:
-            raise ValueError(
-                f"n_head={self.n_head} does not divide n_embd={self.n_embd}"
-            )
+            raise ValueError(f"n_head={self.n_head} does not divide n_embd={self.n_embd}")
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -129,9 +127,7 @@ class GPT:
 
         def random_vector(*, cols: int) -> Vector:
             """Return ``cols`` leaf nodes, one draw each."""
-            return [
-                Node(forward_val=rng.gauss(mu=0.0, sigma=INIT_STD)) for _ in range(cols)
-            ]
+            return [Node(forward_val=rng.gauss(mu=0.0, sigma=INIT_STD)) for _ in range(cols)]
 
         def random_matrix(*, rows: int, cols: int) -> Matrix:
             """Return ``rows`` rows of ``cols`` leaf nodes, one draw each."""
@@ -156,14 +152,10 @@ class GPT:
 
         tables: list[Matrix] = [self.wte, self.wpe]
         for block in self.blocks:
-            tables.extend(
-                [block.wq, block.wk, block.wv, block.wo, block.fc1, block.fc2]
-            )
+            tables.extend([block.wq, block.wk, block.wv, block.wo, block.fc1, block.fc2])
         tables.append(self.lm_head)
 
-        self.params: list[Node] = [
-            node for table in tables for row in table for node in row
-        ]
+        self.params: list[Node] = [node for table in tables for row in table for node in row]
 
     def forward(self, *, tokens: list[int]) -> Matrix:
         """Return one logits vector per position of ``tokens``.
@@ -194,14 +186,10 @@ class GPT:
         if not tokens:
             raise ValueError("tokens is empty")
         if len(tokens) > self.config.context_length:
-            raise ValueError(
-                f"num_tokens={len(tokens)} exceeds context_length={self.config.context_length}"
-            )
+            raise ValueError(f"num_tokens={len(tokens)} exceeds context_length={self.config.context_length}")
         for i, token in enumerate(tokens):
             if token not in range(self.config.vocab_size):
-                raise ValueError(
-                    f"token={token} at position={i} is not in 0...{self.config.vocab_size - 1}"
-                )
+                raise ValueError(f"token={token} at position={i} is not in 0...{self.config.vocab_size - 1}")
 
         residual_stream: Matrix = [
             [te + pe for te, pe in zip(self.wte[token], self.wpe[i], strict=True)]
@@ -225,9 +213,7 @@ class GPT:
             ]
 
             normed = [rmsnorm(x=row) for row in residual_stream]
-            mlp_outputs: Matrix = [
-                mlp(x=row, fc1=block.fc1, fc2=block.fc2) for row in normed
-            ]
+            mlp_outputs: Matrix = [mlp(x=row, fc1=block.fc1, fc2=block.fc2) for row in normed]
             residual_stream = [
                 [a + b for a, b in zip(xi, yi, strict=True)]
                 for xi, yi in zip(residual_stream, mlp_outputs, strict=True)

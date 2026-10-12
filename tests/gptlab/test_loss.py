@@ -62,9 +62,7 @@ def _float_cross_entropy(*, logits: list[float], target: int) -> float:
     return -math.log(_float_softmax(logits=logits)[target])
 
 
-def _float_sequence_loss(
-    *, logits_per_position: list[list[float]], targets: list[int]
-) -> float:
+def _float_sequence_loss(*, logits_per_position: list[list[float]], targets: list[int]) -> float:
     """Return the mean of the per-position losses with floats only."""
     losses = [
         _float_cross_entropy(logits=logits, target=target)
@@ -165,10 +163,7 @@ def test_hand_case_matches() -> None:
 
 
 def test_hand_case_gives_a_different_loss_for_each_target() -> None:
-    losses = [
-        cross_entropy(logits=_nodes(values=HAND_LOGITS), target=t).forward_val
-        for t in range(3)
-    ]
+    losses = [cross_entropy(logits=_nodes(values=HAND_LOGITS), target=t).forward_val for t in range(3)]
     assert losses == pytest.approx(HAND_LOSSES)
 
 
@@ -206,9 +201,7 @@ def test_loss_is_positive_for_finite_logits() -> None:
 def test_loss_is_unchanged_by_a_constant_shift_of_the_logits() -> None:
     logits, targets = _case()
     base = cross_entropy(logits=_nodes(values=logits[0]), target=targets[0])
-    shifted = cross_entropy(
-        logits=_nodes(values=[v + 100.0 for v in logits[0]]), target=targets[0]
-    )
+    shifted = cross_entropy(logits=_nodes(values=[v + 100.0 for v in logits[0]]), target=targets[0])
     assert shifted.forward_val == pytest.approx(base.forward_val)
 
 
@@ -236,9 +229,7 @@ def test_two_positions_give_the_average_of_the_two_single_losses() -> None:
     logits, targets = _case()
     first = cross_entropy(logits=_nodes(values=logits[0]), target=targets[0])
     second = cross_entropy(logits=_nodes(values=logits[1]), target=targets[1])
-    loss = sequence_loss(
-        logits_per_position=_matrix(values=logits[:2]), targets=targets[:2]
-    )
+    loss = sequence_loss(logits_per_position=_matrix(values=logits[:2]), targets=targets[:2])
     expected = (first.forward_val + second.forward_val) / 2
     assert loss.forward_val == pytest.approx(expected)
 
@@ -246,21 +237,15 @@ def test_two_positions_give_the_average_of_the_two_single_losses() -> None:
 def test_one_position_equals_cross_entropy() -> None:
     logits, targets = _case()
     single = cross_entropy(logits=_nodes(values=logits[0]), target=targets[0])
-    loss = sequence_loss(
-        logits_per_position=_matrix(values=logits[:1]), targets=targets[:1]
-    )
+    loss = sequence_loss(logits_per_position=_matrix(values=logits[:1]), targets=targets[:1])
     assert loss.forward_val == pytest.approx(single.forward_val)
 
 
 def test_repeating_a_position_does_not_change_the_loss() -> None:
     # A sum would grow with the number of copies. A mean does not.
     logits, targets = _case()
-    once = sequence_loss(
-        logits_per_position=_matrix(values=logits[:1]), targets=targets[:1]
-    )
-    four = sequence_loss(
-        logits_per_position=_matrix(values=logits[:1] * 4), targets=targets[:1] * 4
-    )
+    once = sequence_loss(logits_per_position=_matrix(values=logits[:1]), targets=targets[:1])
+    four = sequence_loss(logits_per_position=_matrix(values=logits[:1] * 4), targets=targets[:1] * 4)
     assert four.forward_val == pytest.approx(once.forward_val)
 
 

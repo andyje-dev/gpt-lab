@@ -100,15 +100,11 @@ def _float_attention(
         for h in range(n_head):
             lo, hi = h * head_dim, (h + 1) * head_dim
             scores = [
-                sum(a * b for a, b in zip(q[i][lo:hi], k[j][lo:hi], strict=True))
-                / math.sqrt(head_dim)
+                sum(a * b for a, b in zip(q[i][lo:hi], k[j][lo:hi], strict=True)) / math.sqrt(head_dim)
                 for j in range(i + 1)
             ]
             weights = _float_softmax(scores=scores)
-            heads += [
-                sum(weights[j] * v[j][lo + t] for j in range(i + 1))
-                for t in range(head_dim)
-            ]
+            heads += [sum(weights[j] * v[j][lo + t] for j in range(i + 1)) for t in range(head_dim)]
         outputs.append(_float_linear(x=heads, w=wo))
     return outputs
 
@@ -137,10 +133,7 @@ def _float_forward(
     MLP pre-activation of every block and position, for the ReLU kink guard
     of the gradient check.
     """
-    x = [
-        [t + p for t, p in zip(wte[token], wpe[i], strict=True)]
-        for i, token in enumerate(tokens)
-    ]
+    x = [[t + p for t, p in zip(wte[token], wpe[i], strict=True)] for i, token in enumerate(tokens)]
     x = [_float_rmsnorm(x=xi) for xi in x]
     pre_activations: list[float] = []
     for block in blocks:
@@ -153,20 +146,14 @@ def _float_forward(
             wo=block["wo"],
             n_head=n_head,
         )
-        x = [
-            [a + b for a, b in zip(xi, yi, strict=True)]
-            for xi, yi in zip(x, attended, strict=True)
-        ]
+        x = [[a + b for a, b in zip(xi, yi, strict=True)] for xi, yi in zip(x, attended, strict=True)]
         normed = [_float_rmsnorm(x=xi) for xi in x]
         mlp_out = []
         for xi in normed:
             out, pre = _float_mlp(x=xi, fc1=block["fc1"], fc2=block["fc2"])
             mlp_out.append(out)
             pre_activations.extend(pre)
-        x = [
-            [a + b for a, b in zip(xi, yi, strict=True)]
-            for xi, yi in zip(x, mlp_out, strict=True)
-        ]
+        x = [[a + b for a, b in zip(xi, yi, strict=True)] for xi, yi in zip(x, mlp_out, strict=True)]
     x = [_float_rmsnorm(x=xi) for xi in x]
     return [_float_linear(x=xi, w=lm_head) for xi in x], pre_activations
 
@@ -178,10 +165,7 @@ def _float_cross_entropy(*, logits: list[float], target: int) -> float:
 
 def _float_sequence_loss(*, logits: list[list[float]], targets: list[int]) -> float:
     """Return the mean cross-entropy over the positions with floats only."""
-    losses = [
-        _float_cross_entropy(logits=lg, target=t)
-        for lg, t in zip(logits, targets, strict=True)
-    ]
+    losses = [_float_cross_entropy(logits=lg, target=t) for lg, t in zip(logits, targets, strict=True)]
     return sum(losses) / len(losses)
 
 
@@ -239,9 +223,7 @@ def _model(*, config: Config = CONFIG, seed: int = SEED) -> GPT:
     return GPT(config=config, seed=seed)
 
 
-def _float_logits(
-    *, model: GPT, config: Config, tokens: list[int]
-) -> list[list[float]]:
+def _float_logits(*, model: GPT, config: Config, tokens: list[int]) -> list[list[float]]:
     """Return the float reference logits for the parameters that ``model`` holds."""
     wte, wpe, blocks, lm_head = _unpack(v=_values(nodes=model.params), config=config)
     logits, _ = _float_forward(
@@ -272,11 +254,7 @@ def test_n_head_must_divide_n_embd_at_construction() -> None:
     # n_embd = 4. 3 heads would give head_dim = 1 and drop one dimension.
     # The error comes before any forward pass, from Config or from GPT.
     with pytest.raises(ValueError):
-        _model(
-            config=Config(
-                vocab_size=4, n_blocks=1, n_embd=4, n_head=3, context_length=4
-            )
-        )
+        _model(config=Config(vocab_size=4, n_blocks=1, n_embd=4, n_head=3, context_length=4))
 
 
 # --- Group 2: init (Section 2) -----------------------------------------------
@@ -375,12 +353,7 @@ def test_params_starts_with_wte_then_wpe() -> None:
     flat_wte = [node for row in model.wte for node in row]
     flat_wpe = [node for row in model.wpe for node in row]
     assert all(a is b for a, b in zip(model.params[:n_wte], flat_wte, strict=True))
-    assert all(
-        a is b
-        for a, b in zip(
-            model.params[n_wte : n_wte + len(flat_wpe)], flat_wpe, strict=True
-        )
-    )
+    assert all(a is b for a, b in zip(model.params[n_wte : n_wte + len(flat_wpe)], flat_wpe, strict=True))
 
 
 # --- Group 4: guards (Section 6) ---------------------------------------------
@@ -447,9 +420,7 @@ def test_a_repeated_token_is_allowed() -> None:
 
 def test_every_parameter_is_below_the_loss_when_all_tokens_are_used() -> None:
     model = _model()
-    loss = sequence_loss(
-        logits_per_position=model.forward(tokens=TOKENS), targets=TARGETS
-    )
+    loss = sequence_loss(logits_per_position=model.forward(tokens=TOKENS), targets=TARGETS)
     below = _reachable(root=loss)
     assert all(p in below for p in model.params)
 
@@ -457,9 +428,7 @@ def test_every_parameter_is_below_the_loss_when_all_tokens_are_used() -> None:
 def test_an_unused_wpe_row_is_not_below_the_loss() -> None:
     # Three positions, four wpe rows. Row 3 is not read.
     model = _model()
-    loss = sequence_loss(
-        logits_per_position=model.forward(tokens=[0, 1, 2]), targets=[1, 2, 3]
-    )
+    loss = sequence_loss(logits_per_position=model.forward(tokens=[0, 1, 2]), targets=[1, 2, 3])
     below = _reachable(root=loss)
     assert not any(p in below for p in model.wpe[3])
     assert all(p in below for p in model.wpe[2])
@@ -468,9 +437,7 @@ def test_an_unused_wpe_row_is_not_below_the_loss() -> None:
 def test_the_wte_row_of_an_unused_token_gets_gradient_zero() -> None:
     # Token 3 is not in the input. Its row is not in the graph.
     model = _model()
-    loss = sequence_loss(
-        logits_per_position=model.forward(tokens=[0, 1, 2]), targets=[1, 2, 0]
-    )
+    loss = sequence_loss(logits_per_position=model.forward(tokens=[0, 1, 2]), targets=[1, 2, 0])
     loss.backward()
     assert _gradients(nodes=model.wte[3]) == [0.0] * CONFIG.n_embd
     assert any(g != 0.0 for g in _gradients(nodes=model.wte[0]))
@@ -483,9 +450,7 @@ def test_a_token_used_twice_sums_both_gradients_into_one_row() -> None:
     model = _model()
     tokens = [1, 0, 1]
     targets = [0, 1, 0]
-    loss = sequence_loss(
-        logits_per_position=model.forward(tokens=tokens), targets=targets
-    )
+    loss = sequence_loss(logits_per_position=model.forward(tokens=tokens), targets=targets)
     loss.backward()
 
     inputs = _values(nodes=model.params)
@@ -619,9 +584,7 @@ def test_backward_matches_finite_difference() -> None:
     expected, pre_activations = _float_loss(v=inputs)
     assert all(abs(p) > KINK_MARGIN for p in pre_activations)
 
-    loss = sequence_loss(
-        logits_per_position=model.forward(tokens=GRAD_TOKENS), targets=GRAD_TARGETS
-    )
+    loss = sequence_loss(logits_per_position=model.forward(tokens=GRAD_TOKENS), targets=GRAD_TARGETS)
     assert isinstance(loss, Node)
     assert loss.forward_val == pytest.approx(expected)
     loss.backward()

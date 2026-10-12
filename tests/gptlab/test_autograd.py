@@ -200,9 +200,7 @@ def test_log_propagate_uses_reciprocal_of_input() -> None:
     [(3.0, 1.0), (-7.0, 0.0), (0.0, 0.0)],
     ids=["positive", "negative", "zero"],
 )
-def test_relu_propagate_passes_gradient_only_when_positive(
-    *, value: float, slope: float
-) -> None:
+def test_relu_propagate_passes_gradient_only_when_positive(*, value: float, slope: float) -> None:
     # d/da max(0, a) = 1 if a > 0 else 0. At a == 0 we choose 0.
     a = Node(forward_val=value)
     c = a.relu()
@@ -417,20 +415,14 @@ def _loss_nonlinear(*, a: float | Node, b: float | Node) -> float | Node:
     ("a_val", "b_val"),
     [(1.5, -4.0), (0.3, 2.0), (-2.0, 0.7)],
 )
-def test_backward_matches_finite_difference(
-    *, loss_fn, a_val: float, b_val: float
-) -> None:
+def test_backward_matches_finite_difference(*, loss_fn, a_val: float, b_val: float) -> None:
     a, b = Node(forward_val=a_val), Node(forward_val=b_val)
     loss = loss_fn(a=a, b=b)
     assert isinstance(loss, Node)
     loss.backward()
 
-    numeric_da = (loss_fn(a=a_val + H, b=b_val) - loss_fn(a=a_val - H, b=b_val)) / (
-        2 * H
-    )
-    numeric_db = (loss_fn(a=a_val, b=b_val + H) - loss_fn(a=a_val, b=b_val - H)) / (
-        2 * H
-    )
+    numeric_da = (loss_fn(a=a_val + H, b=b_val) - loss_fn(a=a_val - H, b=b_val)) / (2 * H)
+    numeric_db = (loss_fn(a=a_val, b=b_val + H) - loss_fn(a=a_val, b=b_val - H)) / (2 * H)
 
     assert a.gradient == pytest.approx(numeric_da, abs=TOL)
     assert b.gradient == pytest.approx(numeric_db, abs=TOL)

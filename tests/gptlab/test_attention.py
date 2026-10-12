@@ -72,8 +72,7 @@ def _float_attend(
     scores = [sum(a * b for a, b in zip(q, key, strict=True)) * scale for key in keys]
     weights = _float_softmax(scores=scores)
     return [
-        sum(w * value[t] for w, value in zip(weights, values, strict=True))
-        for t in range(len(values[0]))
+        sum(w * value[t] for w, value in zip(weights, values, strict=True)) for t in range(len(values[0]))
     ]
 
 
@@ -99,15 +98,11 @@ def _float_attention(
         for h in range(n_head):
             lo, hi = h * head_dim, (h + 1) * head_dim
             scores = [
-                sum(a * b for a, b in zip(q[i][lo:hi], k[j][lo:hi], strict=True))
-                / math.sqrt(head_dim)
+                sum(a * b for a, b in zip(q[i][lo:hi], k[j][lo:hi], strict=True)) / math.sqrt(head_dim)
                 for j in range(i + 1)
             ]
             weights = _float_softmax(scores=scores)
-            heads += [
-                sum(weights[j] * v[j][lo + t] for j in range(i + 1))
-                for t in range(head_dim)
-            ]
+            heads += [sum(weights[j] * v[j][lo + t] for j in range(i + 1)) for t in range(head_dim)]
         outputs.append(_float_linear(x=heads, w=wo))
     return outputs
 
