@@ -59,7 +59,8 @@ The steps, in order:
 | 6    | User   | Refactor from the audit.                                                                                                                                                                                                                   |
 | 7    | Claude | Write all docstrings, Google style. Leave the body unchanged.                                                                                                                                                                              |
 | 8    | Claude | Rewrite `docs/<MODULE>.md` in the format of the existing documents, in Simplified Technical English. Fold the decisions log into the prose as the reason for each choice.                                                                  |
-| 9    | User   | Add the row to `docs/README.md`, commit, close the issue.                                                                                                                                                                                  |
+| 9    | Claude | Add the row to `docs/README.md`. Run the full checks. Commit the module, tests, and doc in one commit. See the format below.                                                                                                                |
+| 10   | Claude | Close the issue with a comment that names the commits. See the format below.                                                                                                                                                              |
 
 The implementation steps in the outline (step 1) break the function into
 parts. Each part has numbered steps, a column that says which tests the
@@ -70,6 +71,46 @@ table of likely failures with their causes.
 
 Keep the work-steps table in the outline current: mark a step done when
 it is done.
+
+### Committing (step 9)
+
+One commit per module, after step 8 and the README row, with the full
+checks clean. The subject line is lower case, no period, in this form:
+
+```
+<module> implementation, tests, and docs
+```
+
+The body ends with the attribution line that the session gives for
+commits. Do not push. The user reviews the commit and pushes.
+
+A change that is not a module landing (a convention change across files,
+a CLAUDE.md edit) gets its own commit with a subject that says what
+changed, as `import functions by name instead of module` does.
+
+### Closing the issue (step 10)
+
+Close the issue right after the commit of step 9. Check `git status` is
+clean and `git log --oneline` shows the commit first. Close with
+`gh issue close <N> --comment "..."`. The comment is one line in this form:
+
+```
+Done in <hash>: <module>.py, test_<module>.py (<count> tests), docs/<MODULE>.md.
+```
+
+- `<hash>` is the short hash of the commit that landed the module, tests,
+  and doc. Take it from `git log --oneline`, never from memory.
+- `<count>` is the number of tests in the file. Take it from
+  `uv run pytest tests/gptlab/test_<module>.py -q`.
+- If later commits changed the module before the close, add one sentence:
+  "Follow-ups in <hash> (<what changed>), <hash> (<what changed>)."
+- No other text. The doc and the commit message hold the detail.
+
+Example, from issue #5:
+
+```
+Done in 9c28642: mlp.py, test_mlp.py (11 tests), docs/MLP.md. Follow-ups in 9313b62 (tests import functions by name) and 9062153 (CLAUDE.md with the module process).
+```
 
 ## 4. Code conventions
 
@@ -190,4 +231,4 @@ uv run ty check src
 Lefthook runs format, lint, and typecheck on commit, and tests on push.
 Run the full checks before reporting a step done.
 
-Commits are the user's. Do not commit or push unless asked.
+Claude commits at step 9 and when asked. Claude never pushes.
