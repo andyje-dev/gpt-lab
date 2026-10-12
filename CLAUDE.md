@@ -205,8 +205,7 @@ case. `docs/README.md` is the index in reading order and holds the shared
   "coming soon", no plan sections. The plan is in the issues.
 - Sections follow the order of the code. Each numbered section opens with
   a `> Code:` line (names, never line numbers) and a `> Tests:` line (test
-  group). Section 1 is "The problem" and has no `Code:` line. The last
-  section is "Check the gradients with numbers", with `Code: none`.
+  group). Section 1 is "The problem" and has no `Code:` line.
 - Cross-references name the document and the section:
   "section 4 of `docs/LAYERS.md`". A section number alone points inside
   the current document. No forward references.

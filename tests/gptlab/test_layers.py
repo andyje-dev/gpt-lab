@@ -262,7 +262,7 @@ def test_transpose_rejects_rows_of_different_length() -> None:
         transpose(m=ragged)
 
 
-# --- Group 6: numeric gradient check (Section 8) -----------------------------
+# --- Group 6: numeric gradient check (AUTOGRAD.md section 10) ----------------
 #
 # Same method as autograd test group 7: compare the autograd gradient of each
 # input against a central finite difference, (f(v + h) - f(v - h)) / (2h).

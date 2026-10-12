@@ -181,7 +181,7 @@ def test_forward_matches_float_reference_on_a_second_seed() -> None:
     assert _values(nodes=_run(x=x, fc1=fc1, fc2=fc2)) == pytest.approx(expected)
 
 
-# --- Group 4: numeric gradient check (Section 3) -----------------------------
+# --- Group 4: numeric gradient check (AUTOGRAD.md section 10) ----------------
 #
 # Same method as layers test group 6: compare the autograd gradient of each
 # input against a central finite difference, (f(v + h) - f(v - h)) / (2h).

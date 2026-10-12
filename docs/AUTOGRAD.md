@@ -491,3 +491,13 @@ dL/dx ~ (L(x + h) - L(x - h)) / (2h)
 - The sample points keep `a * b` away from zero. Thus, the ReLU kink is not
   hit. The derivative is not defined there, and a numeric estimate across
   the kink is not meaningful.
+
+A gradient check proves that the backward pass matches the forward pass. It
+does not prove that the forward pass is the right function. A loss with the
+wrong sign passes the check, because its gradient is the true derivative of
+the wrong function. The hand cases and the property tests hold the forward
+pass in place. The two kinds of test cover each other's blind spot.
+
+Every later module ends its test file with the same check, and the group
+comment there points to this section. The later documents mention the
+check only where a fact about the module shows up in it.

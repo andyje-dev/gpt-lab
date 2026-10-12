@@ -9,7 +9,6 @@
 
 - [1. The problem](#1-the-problem)
 - [2. Expand, cut, contract](#2-expand-cut-contract)
-- [3. Check the gradients with numbers](#3-check-the-gradients-with-numbers)
 
 
 ## 1. The problem
@@ -46,7 +45,8 @@ code around it.
 ## 2. Expand, cut, contract
 
 > Code: `mlp`
-> Tests: group 1 (shape), group 2 (hand case), group 3 (float reference)
+> Tests: group 1 (shape), group 2 (hand case), group 3 (float reference),
+> group 4 (numeric gradient check)
 
 The function computes:
 
@@ -124,8 +124,16 @@ zero on that input. The hand case tests check both: the row that feeds the
 cut unit receives zero, and the row that feeds an on unit receives `x`.
 
 At exactly zero, `relu` passes no gradient. The forward value is zero
-either way, so the choice only matters for the gradient, and section 3
-says why the test avoids the point.
+either way, so the choice only matters for the gradient. The point is a
+**kink**: the slope is `0` on one side and `1` on the other, and the
+derivative is not defined at the point itself. A central finite difference
+averages the slope on both sides of a point. If a pre-activation is within
+`h` of zero, one side is on and the other is off, and the average matches
+neither. The autograd gradient picks one side. So before the gradient check
+of group 4 compares anything, it checks that every pre-activation of its
+case is more than `1e-3` from zero, a thousand times `h`. The check makes
+the seed choice explicit. A future change of the seed then fails on the
+check and not on a gradient that looks wrong for no reason.
 
 The block uses ReLU and not GELU. GELU is smooth and is the usual choice in
 later models. It would need a new primitive, or a long expression of the
@@ -174,29 +182,3 @@ the test cannot pass by chance.
   raises `ValueError` inside `linear`. 
 - No residual, no normalization, no loop over positions. Section 1 says
   where they are.
-
-## 3. Check the gradients with numbers
-
-> Code: none
-> Tests: group 4 (numeric gradient check)
-
-The method is in section 10 of `docs/AUTOGRAD.md` and section 8 of
-`docs/LAYERS.md`. Compare `backward` with a central finite difference.
-
-The case is `n_embd = 2` and `n_hidden = 4`. The test perturbs every float: the 2 elements of
-`x`, the 8 of `fc1`, and the 8 of `fc2`. The float reference is a second
-MLP, written in the test file with floats only. It shares no code with the
-module.
-
-ReLU has a kink at zero. The finite difference `(f(v + h) - f(v - h)) /
-(2h)` averages the slope on both sides of the point. If a pre-activation is
-within `h` of zero, one side is on and the other is off, and the average
-matches neither. The autograd gradient picks one side. Before it compares
-anything, the test checks that every pre-activation of the seeded case is
-more than `1e-3` from zero, a thousand times `h`. The guard makes the seed
-choice explicit, so a future change of the seed fails on the guard and not
-on a gradient that looks wrong for no reason.
-
-A gradient check proves that the backward pass matches the forward pass. It
-does not prove that the forward pass is an MLP. The other three test groups
-hold that in place.

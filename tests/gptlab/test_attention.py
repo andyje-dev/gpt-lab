@@ -357,7 +357,7 @@ def test_an_earlier_position_does_change_later_outputs() -> None:
     assert _values(nodes=out[2]) != pytest.approx(_values(nodes=base[2]))
 
 
-# --- Group 6: numeric gradient check (Section 7) -----------------------------
+# --- Group 6: numeric gradient check (AUTOGRAD.md section 10) ----------------
 #
 # Same method as layers test group 6: compare the autograd gradient of each
 # input against a central finite difference, (f(v + h) - f(v - h)) / (2h).

@@ -13,7 +13,6 @@
 - [4. Queries, keys, values](#4-queries-keys-values)
 - [5. The causal mask is a slice bound](#5-the-causal-mask-is-a-slice-bound)
 - [6. Join and output projection](#6-join-and-output-projection)
-- [7. Check the gradients with numbers](#7-check-the-gradients-with-numbers)
 
 
 ## 1. The problem
@@ -286,22 +285,3 @@ With one position, every call of `attend` receives one key, and section 2
 says that the output is then the one value. The output of `attention` is
 `wo @ (wv @ x[0])`, and `wq` and `wk` have no effect. A position with
 nothing to choose between has no use for a query or a key.
-
-## 7. Check the gradients with numbers
-
-> Code: none
-> Tests: group 6 (numeric gradient check)
-
-The method is in section 10 of `docs/AUTOGRAD.md` and section 8 of
-`docs/LAYERS.md`. Compare `backward` with a central finite difference.
-
-The case is 2 positions, 2 heads, `n_embd = 4`. The test perturbs every
-float in `x` and in the four weight matrices. The float reference is a
-second attention, written in the test file with floats and `math` only. It
-shares no code with the module. A match in value and in gradient shows that
-the scale, the transpose, the head slices, and the causal slice bound are
-all exact, and that `wo` receives a gradient.
-
-A gradient check proves that the backward pass matches the forward pass. It
-does not prove that the forward pass is attention. The other five test
-groups hold that in place.

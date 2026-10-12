@@ -14,7 +14,6 @@
 - [5. Softmax, with the shift](#5-softmax-with-the-shift)
 - [6. RMSNorm](#6-rmsnorm)
 - [7. Transpose](#7-transpose)
-- [8. Check the gradients with numbers](#8-check-the-gradients-with-numbers)
 
 
 ## 1. The problem
@@ -106,7 +105,7 @@ changed after it is made. `+=` is a shorter spelling of the same thing.
 ## 3. Dot
 
 > Code: `dot`
-> Tests: group 1 (dot)
+> Tests: group 1 (dot), group 6 (numeric gradient check)
 
 The dot product of two vectors of the same length is the sum of the
 products of their elements:
@@ -163,6 +162,10 @@ One consequence: a seeded loop needs at least one element. The sums in
 `softmax` and `rmsnorm` are seeded in the same way. Thus, every function
 in this module that makes nodes needs a vector with at least one element,
 and each one guards it. The guard is the first line of the function.
+
+The gradient check of group 6 compares this loop with a float reference
+that uses builtin `sum`. The gradients match. So the loop and `sum` agree
+on every number and differ only in the graph.
 
 ### The guards
 
@@ -224,7 +227,7 @@ child of one product only, so it receives `g[i] * x[j]` and nothing else.
 ## 5. Softmax, with the shift
 
 > Code: `softmax`
-> Tests: group 3 (softmax)
+> Tests: group 3 (softmax), group 6 (numeric gradient check)
 
 Softmax turns a vector of logits into a probability distribution:
 
@@ -263,7 +266,8 @@ In the backward pass, addition sends the full gradient to both children.
 Thus:
 
 - `logit` receives the same gradient that it would receive with no shift.
-  The shift is **exact**.
+  The shift is **exact**. Group 6 proves this with numbers. Its float
+  reference for `softmax` has no shift, and the gradients match.
 - The leaf receives a gradient that no code reads. The leaf is not a
   parameter, it is not returned, and the next forward pass makes a new
   shift from the new logits. The shift is **free**.
@@ -287,6 +291,15 @@ The division is `* ... ** -1`. The code computes `denominator ** -1`
 output makes a new power node every time, `2n` nodes in all, and the
 gradient slot of the denominator accumulates `n` equal contributions in
 place of one. Both give the same gradients. The code uses the smaller graph.
+
+### A sum of the outputs has no gradient
+
+The `p[i]` sum to one for any logits. So the sum of the outputs is a
+constant, and its gradient with respect to every logit is zero. A gradient
+check that summed the outputs into one scalar would pass with every
+gradient at zero and prove nothing. Group 6 weights the outputs with fixed,
+distinct coefficients instead. The same weighting is used for every
+function that returns a vector, so no gradient is zero by construction.
 
 ## 6. RMSNorm
 
@@ -396,43 +409,3 @@ length. Without the flag, `zip` stops at the shortest row and discards the
 end of every longer row. The result would have the wrong shape and no
 error. This is the same decision as in `dot`: a wrong shape is an error,
 not a wrong number.
-
-## 8. Check the gradients with numbers
-
-> Code: none
-> Tests: group 6 (numeric gradient check)
-
-The tests in groups 1 to 5 check the forward values. Some compare a function
-with values that we computed by hand. Others check a property that must hold
-for any input: the softmax sums to 1, the output of rmsnorm has unit root
-mean square. Group 6 checks the gradients. It uses the method of
-section 10 of `docs/AUTOGRAD.md`: compare `backward` with a central finite
-difference, `(f(v + h) - f(v - h)) / (2h)`, with `h = 1e-6`.
-
-Five points are specific to this module:
-
-- `linear`, `softmax`, and `rmsnorm` return a vector. A gradient check
-  needs a scalar. The test loss is a weighted sum of the outputs with fixed,
-  distinct coefficients. A plain sum would not do. The plain sum of a
-  softmax is always 1, so every gradient through it would be zero, and the
-  test would prove nothing. `dot` returns one node, so it is its own loss.
-- `linear` has its own case, although every node in it comes from `dot`.
-  The test perturbs its float reference in `w` as well as in `x`. Thus,
-  the match proves `dL/dw`, which is the number the optimizer reads. It
-  also proves the accumulation across rows of section 4.
-- `transpose` is not in this group. It makes no node, so it has no gradient
-  of its own. Group 5 proves it by object identity instead.
-- The float reference for each function is written in the test with `math`.
-  It does not call the function under test. If the two share no code, they
-  cannot share an error.
-- Two claims from earlier sections rest on this group. The float reference
-  for `softmax` has no shift, so the match in value and in gradient proves
-  that the shift of section 5 is exact. The float reference for `dot` is
-  the plain `sum` that section 3 rejects. Thus, the match proves that the
-  seeded loop and builtin `sum` give the same gradient.
-
-A gradient check proves that the backward pass matches the forward pass. It
-does not prove that the forward pass is the right function. A forward pass
-that squares each element before the multiply in `rmsnorm` passes the
-gradient check and fails the hand case. The two groups of tests hold
-different things in place.
