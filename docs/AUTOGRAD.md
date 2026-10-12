@@ -107,9 +107,8 @@ so on, up to the loss.
 We draw the graph with the loss at the top and the weights at the bottom. The
 edges point down, from each node to its children. This is the opposite of
 the direction in which the values were computed: a child exists before its
-parent, because the inputs are computed first. This is the convention of
-micrograd and PyTorch. Keep this picture in mind when you read "child" and
-"parent" in this document.
+parent, because the inputs are computed first. Keep this picture in mind
+when you read "child" and "parent" in this document.
 
 This is the graph of `L = a * b + a ** 2`. Each arrow points from a node to
 one of its children. The node `a` is a child of `c` and also a child of `d`.
