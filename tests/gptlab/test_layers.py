@@ -1,4 +1,4 @@
-"""Unit tests for the layer functions: linear, softmax, rmsnorm.
+"""Unit tests for the layer functions: dot, linear, softmax, rmsnorm, transpose.
 
 Each test group maps to a section of docs/LAYERS.md.
 
@@ -25,7 +25,45 @@ def _values(nodes: list[Node]) -> list[float]:
     return [n.forward_val for n in nodes]
 
 
-# --- Group 1: linear (Section 3) ---------------------------------------------
+# --- Group 1: dot (Section 3) ------------------------------------------------
+
+# Expected value computed by hand: 1*4 + 2*(-1) + 3*0.5 = 3.5
+DOT_X_VALS = [1.0, 2.0, 3.0]
+DOT_Y_VALS = [4.0, -1.0, 0.5]
+DOT_VAL = 3.5
+
+
+def test_dot_matches_hand_computed_case() -> None:
+    d = layers.dot(_nodes(DOT_X_VALS), _nodes(DOT_Y_VALS))
+    assert d.forward_val == pytest.approx(DOT_VAL)
+
+
+def test_dot_returns_one_node() -> None:
+    assert isinstance(layers.dot(_nodes([1.0, 2.0]), _nodes([3.0, 4.0])), Node)
+
+
+def test_dot_equals_one_row_of_linear() -> None:
+    x, y = _nodes(DOT_X_VALS), _nodes(DOT_Y_VALS)
+    (row,) = layers.linear(x, [y])
+    assert layers.dot(x, y).forward_val == pytest.approx(row.forward_val)
+
+
+def test_dot_rejects_vectors_of_different_length() -> None:
+    # zip without strict=True would truncate and return a wrong number.
+    with pytest.raises(ValueError):
+        layers.dot(_nodes([1.0, 2.0, 3.0]), _nodes([1.0, 2.0]))
+    with pytest.raises(ValueError):
+        layers.dot(_nodes([1.0, 2.0]), _nodes([1.0, 2.0, 3.0]))
+
+
+def test_dot_graph_holds_only_the_named_operations() -> None:
+    # x0 * y0 + x1 * y1 is 4 leaves, 2 products, 1 sum: 7 nodes.
+    # Builtin sum would add a leaf Node(0) and one more sum: 9 nodes.
+    d = layers.dot(_nodes([1.0, 2.0]), _nodes([3.0, 4.0]))
+    assert len(d._topological_order()) == 7
+
+
+# --- Group 2: linear (Section 4) ---------------------------------------------
 
 # x has 3 inputs, w has 2 rows. Expected values are computed by hand:
 #   y[0] = 1*1 + 2*0   + 3*(-1)  = -2.0
@@ -63,15 +101,15 @@ def test_linear_rejects_a_row_with_the_wrong_length() -> None:
 
 
 def test_linear_graph_holds_only_the_named_operations() -> None:
-    # y = x0 * w0 + x1 * w1 is 4 leaves, 2 products, 1 sum: 7 nodes.
-    # Builtin sum would add a leaf Node(0) and one more sum: 9 nodes.
+    # One row is one dot: 4 leaves, 2 products, 1 sum, 7 nodes, as in group 1.
+    # The comprehension in linear adds nothing.
     x = _nodes([1.0, 2.0])
     w = [_nodes([3.0, 4.0])]
     (y,) = layers.linear(x, w)
     assert len(y._topological_order()) == 7
 
 
-# --- Group 2: softmax (Section 4) --------------------------------------------
+# --- Group 3: softmax (Section 5) --------------------------------------------
 
 
 def test_softmax_matches_hand_computed_case() -> None:
@@ -107,7 +145,7 @@ def test_softmax_returns_nodes() -> None:
     assert all(isinstance(p, Node) for p in layers.softmax(_nodes([1.0, 2.0])))
 
 
-# --- Group 3: rmsnorm (Section 5) --------------------------------------------
+# --- Group 4: rmsnorm (Section 6) --------------------------------------------
 
 
 def _rms(values: list[float]) -> float:
@@ -142,7 +180,7 @@ def test_rmsnorm_of_zero_vector_does_not_divide_by_zero() -> None:
 
 
 def test_rmsnorm_of_zero_vector_has_finite_gradients() -> None:
-    # Section 5: with eps inside the root, the scale is eps ** -0.5 and each
+    # Section 6: with eps inside the root, the scale is eps ** -0.5 and each
     # x[i] receives exactly coefficient * scale. Nothing is inf or nan.
     eps = 1e-5
     x = _nodes([0.0, 0.0, 0.0])
@@ -162,7 +200,47 @@ def test_rmsnorm_returns_nodes() -> None:
     assert all(isinstance(y, Node) for y in layers.rmsnorm(_nodes([1.0, 2.0])))
 
 
-# --- Group 4: numeric gradient check (Section 6) -----------------------------
+# --- Group 5: transpose (Section 7) ------------------------------------------
+
+# 2 rows of 3 become 3 rows of 2.
+M_VALS = [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]
+M_T_VALS = [[1.0, 4.0], [2.0, 5.0], [3.0, 6.0]]
+
+
+def test_transpose_matches_hand_computed_case() -> None:
+    m = [_nodes(row) for row in M_VALS]
+    assert [_values(row) for row in layers.transpose(m)] == M_T_VALS
+
+
+def test_transpose_shape_is_columns_by_rows() -> None:
+    m = [_nodes(row) for row in M_VALS]
+    t = layers.transpose(m)
+    assert len(t) == 3
+    assert all(len(row) == 2 for row in t)
+
+
+def test_transpose_makes_no_node() -> None:
+    # Section 7: the result holds the same node objects, moved, not copied.
+    m = [_nodes(row) for row in M_VALS]
+    t = layers.transpose(m)
+    for r, row in enumerate(m):
+        for c, node in enumerate(row):
+            assert t[c][r] is node
+
+
+def test_transpose_twice_is_identity() -> None:
+    m = [_nodes(row) for row in M_VALS]
+    assert layers.transpose(layers.transpose(m)) == m
+
+
+def test_transpose_rejects_rows_of_different_length() -> None:
+    # zip without strict=True would drop the tail of the longer row.
+    ragged = [_nodes([1.0, 2.0, 3.0]), _nodes([4.0, 5.0])]
+    with pytest.raises(ValueError):
+        layers.transpose(ragged)
+
+
+# --- Group 6: numeric gradient check (Section 8) -----------------------------
 #
 # Same method as autograd test group 7: compare the autograd gradient of each
 # input against a central finite difference, (f(v + h) - f(v - h)) / (2h).
@@ -174,6 +252,10 @@ def test_rmsnorm_returns_nodes() -> None:
 #
 # The float reference for each layer is written here with math functions. It
 # does not call the layer under test, so the two computations share no code.
+#
+# dot returns one node, so it is its own loss. transpose makes no node and
+# has no gradient of its own; group 5 checks it by object identity instead.
+# linear is still checked on its own: its reference perturbs w as well as x.
 
 H = 1e-6
 TOL = 1e-6
@@ -241,6 +323,16 @@ def _rmsnorm_float_loss(v: list[float]) -> float:
     return _weighted([vi * scale for vi in v], COEFFS)
 
 
+def _dot_node_loss(v: list[Node]) -> Node:
+    """Return ``dot`` of the first 3 and last 3 inputs. It is already a scalar."""
+    return layers.dot(v[:3], v[3:6])
+
+
+def _dot_float_loss(v: list[float]) -> float:
+    """Return the same loss as ``_dot_node_loss`` with floats only."""
+    return sum(xi * yi for xi, yi in zip(v[:3], v[3:6], strict=True))
+
+
 @pytest.mark.parametrize(
     ("inputs", "node_loss", "float_loss"),
     [
@@ -251,8 +343,9 @@ def _rmsnorm_float_loss(v: list[float]) -> float:
         ),
         ([0.5, -1.0, 2.0], _softmax_node_loss, _softmax_float_loss),
         ([1.5, -0.5, 2.0], _rmsnorm_node_loss, _rmsnorm_float_loss),
+        ([1.5, -0.5, 2.0, 0.2, -1.0, 0.7], _dot_node_loss, _dot_float_loss),
     ],
-    ids=["linear", "softmax", "rmsnorm"],
+    ids=["linear", "softmax", "rmsnorm", "dot"],
 )
 def test_backward_matches_finite_difference(inputs, node_loss, float_loss) -> None:
     nodes = _nodes(inputs)

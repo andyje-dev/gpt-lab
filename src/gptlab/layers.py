@@ -1,9 +1,9 @@
-"""Layer functions: linear, softmax, rmsnorm.
+"""Layer functions: dot, linear, softmax, rmsnorm, transpose.
 
-Each function takes a list of nodes and returns a list of nodes. The scalar
-operations of the autograd engine make each output node, so the backward pass
-needs nothing new. The design notes and the reason for each choice are in
-docs/LAYERS.md.
+Each function takes lists of nodes and returns nodes. The scalar operations
+of the autograd engine make each output node, so the backward pass needs
+nothing new. ``transpose`` makes no node at all. It only moves references.
+The design notes and the reason for each choice are in docs/LAYERS.md.
 """
 
 from gptlab.autograd import Node
@@ -12,10 +12,33 @@ Vector = list[Node]
 Matrix = list[Vector]
 
 
+def dot(x: Vector, y: Vector) -> Node:
+    """Return the dot product of ``x`` and ``y``.
+
+    The graph is one product per element and a chain of sums seeded from the
+    first product. ``linear`` calls this function once per row.
+
+    Args:
+        x: The first vector. It must have at least one node.
+        y: The second vector. It must have the same length as ``x``.
+
+    Returns:
+        One node.
+
+    Raises:
+        ValueError: If ``x`` and ``y`` do not have the same length.
+    """
+    dot_product: Node = x[0] * y[0]
+    for xi, yi in zip(x[1:], y[1:], strict=True):
+        dot_product += xi * yi
+
+    return dot_product
+
+
 def linear(x: Vector, w: Matrix) -> Vector:
     """Return the dot product of ``x`` with each row of ``w``.
 
-    There is no bias term.
+    Each output is one call of ``dot``. There is no bias term.
 
     Args:
         x: The input vector. It must have at least one node.
@@ -27,13 +50,7 @@ def linear(x: Vector, w: Matrix) -> Vector:
     Raises:
         ValueError: If a row of ``w`` does not have the same length as ``x``.
     """
-    outputs: Vector = []
-
-    for row in w:
-        dot = x[0] * row[0]
-        for xi, wi in zip(x[1:], row[1:], strict=True):
-            dot += xi * wi
-        outputs.append(dot)
+    outputs: Vector = [dot(x, row) for row in w]
 
     return outputs
 
@@ -94,3 +111,22 @@ def rmsnorm(x: Vector, eps: float = 1e-5) -> Vector:
     outputs: Vector = [xi * inverse_square_root for xi in x]
 
     return outputs
+
+
+def transpose(m: Matrix) -> Matrix:
+    """Return ``m`` with its rows and columns swapped.
+
+    Element ``[r][c]`` of the result is element ``[c][r]`` of ``m``. The
+    function makes no node. Each row of the result holds the same node
+    objects as a column of ``m``.
+
+    Args:
+        m: The matrix. Every row must have the same length.
+
+    Returns:
+        A matrix with one row for each column of ``m``.
+
+    Raises:
+        ValueError: If the rows of ``m`` do not all have the same length.
+    """
+    return [list(col) for col in zip(*m, strict=True)]

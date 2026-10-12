@@ -9,10 +9,12 @@
 
 - [1. The problem](#1-the-problem)
 - [2. Vectors and matrices as lists](#2-vectors-and-matrices-as-lists)
-- [3. Linear](#3-linear)
-- [4. Softmax, with the shift](#4-softmax-with-the-shift)
-- [5. RMSNorm](#5-rmsnorm)
-- [6. Check the gradients with numbers](#6-check-the-gradients-with-numbers)
+- [3. Dot](#3-dot)
+- [4. Linear](#4-linear)
+- [5. Softmax, with the shift](#5-softmax-with-the-shift)
+- [6. RMSNorm](#6-rmsnorm)
+- [7. Transpose](#7-transpose)
+- [8. Check the gradients with numbers](#8-check-the-gradients-with-numbers)
 
 
 ## 1. The problem
@@ -26,23 +28,33 @@ hold no logic of their own:
   `softmax`.
 - A division of a vector by its own scale. This is `rmsnorm`.
 
-Each one is called from more than one place in the model:
+Two more are smaller:
 
-| Function  | Called by                                                                                                                      |
-|-----------|--------------------------------------------------------------------------------------------------------------------------------|
-| `linear`  | Attention, for the query, key, value, and output projections. The MLP, for both of its layers. The model, for the output head. |
-| `softmax` | Attention, over the scores of one position. The loss, over the vocabulary, before `log`.                                       |
-| `rmsnorm` | The model, after the embeddings, before each attention block, before each MLP block, and after the last block.                 |
+- A dot product of two vectors. This is `dot`. It returns one node. It is
+  the loop inside `linear`, and attention calls it on its own for each
+  score.
+- A swap of the rows and columns of a matrix. This is `transpose`. It
+  returns a matrix and makes no node.
+
+Each one is called from at least one place in the model:
+
+| Function    | Called by                                                                                                                      |
+|-------------|--------------------------------------------------------------------------------------------------------------------------------|
+| `linear`    | Attention, for the query, key, value, and output projections. The MLP, for both of its layers. The model, for the output head. |
+| `softmax`   | Attention, over the scores of one position. The loss, over the vocabulary, before `log`.                                       |
+| `rmsnorm`   | The model, after the embeddings, before each attention block, before each MLP block, and after the last block.                 |
+| `dot`       | `linear`, once per row. Attention, for the score of one query against one key.                                                 |
+| `transpose` | Attention, to turn the values of the positions read so far into the rows that `linear` expects.                                |
 
 The two callers of `softmax` give it different inputs. In attention, the
 vector has one score per position up to the current one, so its length
 changes with the position. In the loss, the vector has one logit per token
 in the vocabulary, and the next operation is `log` of one element.
 
-These three functions are one module because they are shared. Attention,
-the MLP, and the loss each call at least one of them. One module and one
-test file prove each function one time. The callers then build on functions
-that are already tested.
+These functions are one module because they are shared, or because they
+are too small to be worth a module and too easy to get wrong to be written
+inline. One module and one test file prove each function one time. The
+callers then build on functions that are already tested.
 
 Each function is a pure function. It takes its inputs as arguments, makes
 nodes, and returns them. It stores nothing between calls. The weight matrix
@@ -75,50 +87,48 @@ Shape convention for a matrix `w`:
 - `len(w[0])` is the number of columns. For a weight matrix, this is the
   number of inputs. It must equal `len(x)`.
 
-A row is one output because the loop in `linear` reads one row against `x`.
-If a column were one output, the loop would need an index into every row.
+A row is one output because `linear` takes the dot product of `x` with one
+row at a time. If a column were one output, the loop would need an index
+into every row.
 
 The code does not check shapes before it starts. The model controls its own
-shapes. One guard is in `linear`: the `zip` over `x` and a row has
-`strict=True`. By default, `zip` stops at the shorter list and raises
-nothing. Without the flag, a row that is longer or shorter than `x` would
-give a wrong number and no error. With the flag, it raises `ValueError`.
-The flag makes no node, so the graph is the same.
+shapes. The one guard is in `dot`, and section 3 describes it. `linear`
+passes each row through it, so a row that is longer or shorter than `x`
+raises `ValueError`.
 
 The running sums use `+=`. The node class has no **in-place** add, so Python
 runs `total = total + item` and binds the name to a new node. No node is
 changed after it is made. `+=` is a shorter spelling of the same thing.
 
-## 3. Linear
+## 3. Dot
 
-> Code: `linear`
-> Tests: group 1 (linear)
+> Code: `dot`
+> Tests: group 1 (dot)
 
-A linear layer multiplies a vector by a matrix. Output `i` is the sum of the
-products of `x` with row `i` of `w`:
+The dot product of two vectors of the same length is the sum of the
+products of their elements:
 
 ```
-y[i] = x[0] * w[i][0] + x[1] * w[i][1] + ... + x[n-1] * w[i][n-1]
+d = x[0] * y[0] + x[1] * y[1] + ... + x[n-1] * y[n-1]
 ```
 
-There is one output per row of `w`. There is no bias term. A bias adds one
-parameter, one leaf, and one sum node per output. The base model trains
-without it, so the baseline keeps the smaller graph. A bias is a later lab
-swap: add it, train, and compare.
-
-Each `*` makes a product node. Each `+` makes a sum node. For one output, the
-graph is a chain of additions. Each addition has one product as a child.
-This is the graph of `y = x0 * w0 + x1 * w1`:
+Each `*` makes a product node. Each `+` makes a sum node. The graph is a
+chain of additions. Each addition has one product as a child. This is the
+graph of `d = x0 * y0 + x1 * y1`:
 
 ```mermaid
 graph TD
-    y["y = p0 + p1"] --> p0["p0 = x0 * w0"]
-    y --> p1["p1 = x1 * w1"]
+    d["d = p0 + p1"] --> p0["p0 = x0 * y0"]
+    d --> p1["p1 = x1 * y1"]
     p0 --> x0["x0"]
-    p0 --> w0["w0"]
+    p0 --> y0["y0"]
     p1 --> x1["x1"]
-    p1 --> w1["w1"]
+    p1 --> y1["y1"]
 ```
+
+This is the one place in the module where a vector is reduced to a number.
+`linear` calls it once per row. Attention calls it once per score. Both
+callers get the same graph from the same tested loop.
 
 ### Why a loop and not `sum`
 
@@ -130,8 +140,8 @@ left operand is an `int`. Python asks `int.__add__` first. It does not know
 the node class, so it returns `NotImplemented`. Python then asks the right
 operand: `items[0].__radd__(0)`. That calls `__add__`, and the first line of
 `__add__` wraps `0` in a new leaf node. The result is one extra node per
-output. Its forward value equals the first product. Its children are the
-first product and a leaf with value `0`.
+dot product. Its forward value equals the first product. Its children are
+the first product and a leaf with value `0`.
 
 This extra node is **harmless**:
 
@@ -139,33 +149,66 @@ This extra node is **harmless**:
   the same gradient with or without the extra node.
 - The leaf with value `0` also receives a gradient. No code reads it.
 
-The extra node is also **waste**. It is one dead node per output, and one
-more thing for a reader to explain. Thus, the code starts `total` from the
+The extra node is also **waste**. It is one dead node per dot product, and
+one more thing for a reader to explain. Thus, the code starts from the
 first product and adds the rest in a loop. The graph then holds only the
 operations that the formula names.
 
 One consequence: a seeded loop needs at least one element. An empty vector
 raises at the seed. The sums in `softmax` and `rmsnorm` are seeded in the
-same way, so every function in this module needs a vector with at least one
-element.
+same way, so every function in this module that makes nodes needs a vector
+with at least one element.
+
+### The guard
+
+The `zip` over `x` and `y` has `strict=True`. By default, `zip` stops at
+the shorter list and raises nothing. Without the flag, two vectors of
+different length would give a wrong number and no error. With the flag, it
+raises `ValueError`. The flag makes no node, so the graph is the same.
+
+### The backward pass through dot
+
+Nothing in `dot` is new to the autograd engine. The chain rule follows from
+sections 6.2 and 6.3 of `docs/AUTOGRAD.md`:
+
+- Each `+` sends the gradient of `d` unchanged to both of its children.
+  Thus, every product in the chain receives the full gradient of `d`.
+- Each product `x[j] * y[j]` sends `g * y[j]` to `x[j]` and `g * x[j]` to
+  `y[j]`.
+
+## 4. Linear
+
+> Code: `linear`
+> Tests: group 2 (linear)
+
+A linear layer multiplies a vector by a matrix. Output `i` is the dot
+product of `x` with row `i` of `w`:
+
+```
+y[i] = dot(x, w[i])
+```
+
+The code is one comprehension over the rows of `w`. There is one output per
+row. The comprehension makes no node of its own. Every node in the graph of
+`linear` is made by `dot`, so the graph of one output is the graph of
+section 3, and the guard of section 3 checks each row against `x`.
+
+There is no bias term. A bias adds one parameter, one leaf, and one sum node
+per output. The base model trains without it, so the baseline keeps the
+smaller graph. A bias is a later lab swap: add it, train, and compare.
 
 ### The backward pass through linear
 
-Nothing in `linear` is new to the autograd engine. The chain rule follows
-from sections 6.2 and 6.3 of `docs/AUTOGRAD.md`:
+Section 3 says what one dot product sends to its inputs. `linear` adds one
+thing: `x[j]` is a child of one product in **every** row. Its gradient slot
+accumulates one term per row, `g[i] * w[i][j]` for each output `i`. This is
+the `+=` of section 5 of `docs/AUTOGRAD.md`. Each weight `w[i][j]` is a
+child of one product only, so it receives `g[i] * x[j]` and nothing else.
 
-- Each `+` sends the gradient of `y[i]` unchanged to both of its children.
-  Thus, every product in the chain receives the full gradient of `y[i]`.
-- Each product `x[j] * w[i][j]` sends `g * w[i][j]` to `x[j]` and
-  `g * x[j]` to `w[i][j]`.
-- `x[j]` is a child of one product in **every** row. Its gradient slot
-  accumulates one term per row. This is the `+=` of section 5 of
-  `docs/AUTOGRAD.md`.
-
-## 4. Softmax, with the shift
+## 5. Softmax, with the shift
 
 > Code: `softmax`
-> Tests: group 2 (softmax)
+> Tests: group 3 (softmax)
 
 Softmax turns a vector of logits into a probability distribution:
 
@@ -229,10 +272,10 @@ output makes a new power node every time, `2n` nodes in all, and the
 gradient slot of the denominator accumulates `n` equal contributions in
 place of one. Both give the same gradients. The code uses the smaller graph.
 
-## 5. RMSNorm
+## 6. RMSNorm
 
 > Code: `rmsnorm`
-> Tests: group 3 (rmsnorm)
+> Tests: group 4 (rmsnorm)
 
 RMSNorm divides each element of a vector by the root mean square of the
 vector:
@@ -248,13 +291,13 @@ sum, mean, add `eps`, power, multiply.
 
 - The squares are a comprehension. The sum is a seeded loop.
 - The mean is `/ len(x)`. The count is a plain number. It becomes one leaf,
-  as in section 4.
+  as in section 5.
 - `eps` is a plain float. It becomes one leaf.
 - The root and the division are one operation: `** -0.5`. There is no
   square root primitive and no division primitive in the engine. One power
   node gives both, as section 6.4 of `docs/AUTOGRAD.md` allows.
 - The power node is computed once. Each `x[i]` is multiplied by it. This
-  is the same choice as the reciprocal in section 4.
+  is the same choice as the reciprocal in section 5.
 
 There is no learned scale. In this model, every call of `rmsnorm` is
 followed by a linear layer with no bias. A scale `g[i]` on `y[i]` multiplies
@@ -294,32 +337,81 @@ The reasons to use it here:
   which is to keep the scale of the activations in range for the layers
   that follow.
 
-## 6. Check the gradients with numbers
+## 7. Transpose
+
+> Code: `transpose`
+> Tests: group 5 (transpose)
+
+The transpose of a matrix swaps its rows and columns. Element `[r][c]` of
+the result is element `[c][r]` of the input. A matrix with `R` rows of `C`
+elements becomes a matrix with `C` rows of `R` elements.
+
+The code is `zip(*m, strict=True)`. The star passes each row of `m` as a
+separate argument to `zip`. `zip` then yields one tuple per column: the
+first elements of every row, then the second elements, and so on. The
+comprehension turns each tuple into a list, so the result is a `Matrix` and
+not a list of tuples.
+
+### No node is made
+
+`zip` and `list` move references. They make no node. Row `c` of the result
+holds the same node objects as column `c` of `m`, in the same order. The
+test in group 5 checks this with `is`, not with `==`. The graph after a
+transpose is the graph before it. There is nothing for the backward pass to
+do, and nothing for a gradient check to prove.
+
+### Why attention needs it
+
+Section 2 says that a row of a weight matrix is one output, and that
+`linear` pairs the input with each row. Attention has the other case. It
+holds the values of the positions read so far as a matrix with one row per
+**position**. It needs one output per **element**, each a weighted sum over
+the positions. The rows are the wrong way round for `linear`. A transpose
+turns them the right way round, and the weighted sum is then
+`linear(weights, transpose(values))`. Section 5 of `docs/ATTENTION.md`
+gives the full argument.
+
+### The guard
+
+`strict=True` raises `ValueError` if the rows do not all have the same
+length. Without the flag, `zip` stops at the shortest row and drops the
+tail of every longer row. The result would have the wrong shape and no
+error. This is the same decision as in `dot`: a wrong shape is an error,
+not a wrong number.
+
+## 8. Check the gradients with numbers
 
 > Code: none
-> Tests: group 4 (numeric gradient check)
+> Tests: group 6 (numeric gradient check)
 
-The tests in groups 1 to 3 check the forward values. Some compare a function
+The tests in groups 1 to 5 check the forward values. Some compare a function
 with values that we computed by hand. Others check a property that must hold
 for any input: the softmax sums to 1, the output of rmsnorm has unit root
-mean square. Group 4 checks the gradients. It uses the method of
+mean square. Group 6 checks the gradients. It uses the method of
 section 10 of `docs/AUTOGRAD.md`: compare `backward` with a central finite
 difference, `(f(v + h) - f(v - h)) / (2h)`, with `h = 1e-6`.
 
-Three points are specific to this module:
+Five points are specific to this module:
 
-- Each function returns a vector. A gradient check needs a scalar. The test
-  loss is a weighted sum of the outputs with fixed, distinct coefficients.
-  A plain sum would not do. The plain sum of a softmax is always 1, so every
-  gradient through it would be zero, and the test would prove nothing.
+- `linear`, `softmax`, and `rmsnorm` return a vector. A gradient check
+  needs a scalar. The test loss is a weighted sum of the outputs with fixed,
+  distinct coefficients. A plain sum would not do. The plain sum of a
+  softmax is always 1, so every gradient through it would be zero, and the
+  test would prove nothing. `dot` returns one node, so it is its own loss.
+- `linear` has its own case even though every node in it comes from `dot`.
+  Its float reference is perturbed in `w` as well as in `x`, so the match
+  proves `dL/dw`, which is the number the optimizer reads, and proves the
+  accumulation across rows of section 4.
+- `transpose` is not in this group. It makes no node, so it has no gradient
+  of its own. Group 5 proves it by object identity instead.
 - The float reference for each function is written in the test with `math`.
   It does not call the function under test. If the two share no code, they
   cannot share an error.
 - Two claims from earlier sections rest on this group. The float reference
   for `softmax` has no shift, so the match in value and in gradient proves
-  that the shift of section 4 is exact. The float reference for `linear` is
-  perturbed in `w` as well as in `x`, so the match proves `dL/dw`, which is
-  the number the optimizer reads.
+  that the shift of section 5 is exact. The float reference for `dot` is
+  the plain `sum` that section 3 rejects, so the match proves that the
+  seeded loop and builtin `sum` give the same gradient.
 
 A gradient check proves that the backward pass matches the forward pass. It
 does not prove that the forward pass is the right function. A forward pass
