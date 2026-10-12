@@ -49,23 +49,26 @@ repo, so nothing in the repo can go stale.
 
 The steps, in order:
 
-| Step | Who    | Work                                                                                                                                                                                                                                       |
-|------|--------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1    | Claude | Write `docs/<MODULE>.md` as a work outline: what the module does, the work steps, the function with a shape table, implementation steps per part, the test groups, the planned final sections, a decisions log, and open questions.        |
-| 2    | Claude | Write `tests/gptlab/test_<module>.py` and a one-line docstring stub for `src/gptlab/<module>.py` so pytest collects. Verify the tests against a throwaway reference that never lands in `src/`. Then confirm every test fails on the stub. |
-| 3    | User   | Implement against the tests until they pass (TDD).                                                                                                                                                                                         |
-| 4    | Both   | Discuss. Claude adds each decision to the decisions log in the outline as it is made, with the reason.                                                                                                                                     |
-| 5    | Claude | Audit the code against the issue and the conventions of the existing modules. Findings most important first, with a pointer to the sibling code to compare. Record the audit in the outline.                                               |
-| 6    | User   | Refactor from the audit.                                                                                                                                                                                                                   |
-| 7    | Claude | Write all docstrings, Google style. Leave the body unchanged.                                                                                                                                                                              |
-| 8    | Claude | Rewrite `docs/<MODULE>.md` in the format of the existing documents, in Simplified Technical English. Fold the decisions log into the prose as the reason for each choice.                                                                  |
-| 9    | Claude | Add the row to `docs/README.md`. Run the full checks. Report that the module is ready to commit.                                                                                                                                           |
-| 10   | User   | Commit the module, tests, and docs and push. See the format below.                                                                                                                                                                         |
-| 11   | Claude | After the user says the commit is in, close the issue with a comment that names the commits. See the format below.                                                                                                                         |
+| Step | Who    | Work                                                                                                                                                                                                                                                |
+|------|--------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1    | Claude | Write `docs/<MODULE>.md` as a work outline: what the module does, the work steps, the function with a shape table, implementation steps per part with pseudocode, the test groups, the planned final sections, a decisions log, and open questions. |
+| 2    | Claude | Write `tests/gptlab/test_<module>.py` and a one-line docstring stub for `src/gptlab/<module>.py` so pytest collects. Verify the tests against a throwaway reference that never lands in `src/`. Then confirm every test fails on the stub.          |
+| 3    | User   | Implement against the tests until they pass (TDD).                                                                                                                                                                                                  |
+| 4    | Both   | Discuss. Claude adds each decision to the decisions log in the outline as it is made, with the reason.                                                                                                                                              |
+| 5    | Claude | Audit the code against the issue and the conventions of the existing modules. Findings most important first, with a pointer to the sibling code to compare. Record the audit in the outline.                                                        |
+| 6    | User   | Refactor from the audit.                                                                                                                                                                                                                            |
+| 7    | Claude | Write all docstrings, Google style. Leave the body unchanged.                                                                                                                                                                                       |
+| 8    | Claude | Rewrite `docs/<MODULE>.md` in the format of the existing documents, in Simplified Technical English. Fold the decisions log into the prose as the reason for each choice.                                                                           |
+| 9    | Claude | Add the row to `docs/README.md`. Run the full checks. Report that the module is ready to commit.                                                                                                                                                    |
+| 10   | User   | Commit the module, tests, and docs and push. See the format below.                                                                                                                                                                                  |
+| 11   | Claude | After the user says the commit is in, close the issue with a comment that names the commits. See the format below.                                                                                                                                  |
 
 The implementation steps in the outline (step 1) break the function into
 parts. Each part has numbered steps, a column that says which tests the
-part makes pass, and questions to settle before writing it. When the user
+part makes pass, pseudocode, and questions to settle before writing it.
+The pseudocode is not Python. It names the steps in order and the values
+each one reads and writes, so the user still chooses the loop form, the
+names, and the guards. When the user
 asks for more detail on a part, add what they hold at that point, what the
 part must do to it, a comparison with a part they already wrote, and a
 table of likely failures with their causes.
