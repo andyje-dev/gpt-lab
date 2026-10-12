@@ -59,8 +59,9 @@ The steps, in order:
 | 6    | User   | Refactor from the audit.                                                                                                                                                                                                                   |
 | 7    | Claude | Write all docstrings, Google style. Leave the body unchanged.                                                                                                                                                                              |
 | 8    | Claude | Rewrite `docs/<MODULE>.md` in the format of the existing documents, in Simplified Technical English. Fold the decisions log into the prose as the reason for each choice.                                                                  |
-| 9    | Claude | Add the row to `docs/README.md`. Run the full checks. Commit the module, tests, and doc in one commit. See the format below.                                                                                                               |
-| 10   | Claude | Close the issue with a comment that names the commits. See the format below.                                                                                                                                                               |
+| 9    | Claude | Add the row to `docs/README.md`. Run the full checks. Report that the module is ready to commit.                                                                                                                                           |
+| 10   | User   | Commit the module, tests, and docs and push. See the format below.                                                                                                                                                                         |
+| 11   | Claude | After the user says the commit is in, close the issue with a comment that names the commits. See the format below.                                                                                                                         |
 
 The implementation steps in the outline (step 1) break the function into
 parts. Each part has numbered steps, a column that says which tests the
@@ -72,26 +73,24 @@ table of likely failures with their causes.
 Keep the work-steps table in the outline current: mark a step done when
 it is done.
 
-### Committing (step 9)
+### Committing (step 10)
 
-One commit per module, after step 8 and the README row, with the full
-checks clean. The subject line is lower case, no period, in this form:
+The user commits and pushes. Claude never runs `git commit` or `git push`,
+not even when a step table says the work is done. Claude reports that the
+work is ready and stops.
 
 ```
 <module> implementation, tests, and docs
 ```
 
-The body ends with the attribution line that the session gives for
-commits. Do not push. The user reviews the commit and pushes.
-
 A change that is not a module landing (a convention change across files,
 a CLAUDE.md edit) gets its own commit with a subject that says what
 changed, as `import functions by name instead of module` does.
 
-### Closing the issue (step 10)
+### Closing the issue (step 11)
 
-Close the issue right after the commit of step 9. Check `git status` is
-clean and `git log --oneline` shows the commit first. Close with
+Close the issue after the user says the commit of step 10 is in. Check
+`git status` is clean and `git log --oneline` shows the commit first. Close with
 `gh issue close <N> --comment "..."`. The comment is one line in this form:
 
 ```
@@ -245,5 +244,3 @@ uv run ty check src
 
 Lefthook runs format, lint, and typecheck on commit, and tests on push.
 Run the full checks before reporting a step done.
-
-Claude commits at step 9 and when asked. Claude never pushes.
