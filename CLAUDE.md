@@ -59,8 +59,8 @@ The steps, in order:
 | 6    | User   | Refactor from the audit.                                                                                                                                                                                                                   |
 | 7    | Claude | Write all docstrings, Google style. Leave the body unchanged.                                                                                                                                                                              |
 | 8    | Claude | Rewrite `docs/<MODULE>.md` in the format of the existing documents, in Simplified Technical English. Fold the decisions log into the prose as the reason for each choice.                                                                  |
-| 9    | Claude | Add the row to `docs/README.md`. Run the full checks. Commit the module, tests, and doc in one commit. See the format below.                                                                                                                |
-| 10   | Claude | Close the issue with a comment that names the commits. See the format below.                                                                                                                                                              |
+| 9    | Claude | Add the row to `docs/README.md`. Run the full checks. Commit the module, tests, and doc in one commit. See the format below.                                                                                                               |
+| 10   | Claude | Close the issue with a comment that names the commits. See the format below.                                                                                                                                                               |
 
 The implementation steps in the outline (step 1) break the function into
 parts. Each part has numbered steps, a column that says which tests the
