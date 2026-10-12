@@ -255,6 +255,12 @@ def test_split_heads_with_one_head_is_the_whole_matrix() -> None:
     assert head == m
 
 
+def test_split_heads_rejects_an_empty_matrix() -> None:
+    # head_dim reads the length of m[0]. The guard says m is empty.
+    with pytest.raises(ValueError):
+        split_heads(m=[], n_head=2)
+
+
 # --- Group 3: shape (Sections 4 and 6) ---------------------------------------
 
 
@@ -289,6 +295,13 @@ def test_n_head_must_divide_n_embd() -> None:
     x, wq, wk, wv, wo = _case()
     with pytest.raises(ValueError):
         _run(x=x, wq=wq, wk=wk, wv=wv, wo=wo, n_head=3)
+
+
+def test_rejects_an_empty_sequence() -> None:
+    # n_embd reads the length of x[0]. The guard says x is empty.
+    _, wq, wk, wv, wo = _case()
+    with pytest.raises(ValueError):
+        _run(x=[], wq=wq, wk=wk, wv=wv, wo=wo)
 
 
 # --- Group 4: one position (Section 6) ---------------------------------------

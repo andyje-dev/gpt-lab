@@ -54,7 +54,12 @@ def split_heads(*, m: Matrix, n_head: int) -> list[Matrix]:
     Returns:
         A list of ``n_head`` matrices. Each has one row per position, and
         each row has ``head_dim`` nodes.
+
+    Raises:
+        ValueError: If ``m`` is empty.
     """
+    if len(m) == 0:
+        raise ValueError("m is empty")
     head_dim: int = len(m[0]) // n_head
 
     return [
@@ -85,8 +90,11 @@ def attention(
         One vector per position, each with ``n_embd`` nodes.
 
     Raises:
-        ValueError: If ``n_head`` does not divide ``n_embd``.
+        ValueError: If ``x`` is empty, or if ``n_head`` does not divide
+            ``n_embd``.
     """
+    if len(x) == 0:
+        raise ValueError("x is empty")
     n_embd: int = len(x[0])
     if n_embd % n_head != 0:
         raise ValueError(f"n_head={n_head} does not divide n_embd={n_embd}")

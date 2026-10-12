@@ -26,8 +26,11 @@ def dot(*, x: Vector, y: Vector) -> Node:
         One node.
 
     Raises:
-        ValueError: If ``x`` and ``y`` do not have the same length.
+        ValueError: If ``x`` is empty, or if ``x`` and ``y`` do not have the
+            same length.
     """
+    if len(x) == 0:
+        raise ValueError("x is empty")
     dot_product: Node = x[0] * y[0]
     for xi, yi in zip(x[1:], y[1:], strict=True):
         dot_product += xi * yi
@@ -68,7 +71,12 @@ def softmax(*, logits: Vector) -> Vector:
     Returns:
         A vector with the same length as ``logits``. Each node is between
         zero and one. The nodes sum to one.
+
+    Raises:
+        ValueError: If ``logits`` is empty.
     """
+    if len(logits) == 0:
+        raise ValueError("logits is empty")
     max_logit = max(logit.forward_val for logit in logits)
 
     exponentials: Vector = [(logit - max_logit).exp() for logit in logits]
@@ -97,7 +105,12 @@ def rmsnorm(*, x: Vector, eps: float = 1e-5) -> Vector:
 
     Returns:
         A vector with the same length as ``x``.
+
+    Raises:
+        ValueError: If ``x`` is empty.
     """
+    if len(x) == 0:
+        raise ValueError("x is empty")
     squares: Vector = [xi**2 for xi in x]
 
     sum_of_squares: Node = squares[0]

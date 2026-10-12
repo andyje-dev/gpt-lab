@@ -166,12 +166,16 @@ slice reaches the same node in the row that the slice came from.
 Head 0 never scores against an element of head 1, and never reads one. The
 heads are independent until section 6 joins them.
 
-`split_heads` does not check that `n_head` divides the row length. The
+`split_heads` does not check that `n_head` divides the row length. That
 guard is in `attention`, where the error message can give both numbers.
+`split_heads` does check that `m` has a row, because `head_dim` reads the
+length of `m[0]`. An empty `m` raises `ValueError` with the message
+`m is empty`, as `dot` does for an empty vector in section 3 of
+`docs/LAYERS.md`.
 
 ## 4. Queries, keys, values
 
-> Code: `n_embd`, the `ValueError` guard, `head_dim`, `scale`, and the
+> Code: `n_embd`, the two `ValueError` guards, `head_dim`, `scale`, and the
 > three lines that project and split
 > Tests: group 3 (shape)
 
@@ -193,7 +197,11 @@ Each projection is a comprehension over every position. The result goes
 directly into `split_heads`. Thus, `q`, `k`, and `v` are lists of matrices,
 head first, then position, as section 3 describes.
 
-### The guard
+### The guards
+
+`x` must have a position, because `n_embd` reads the length of `x[0]`. An
+empty `x` raises `ValueError` with the message `x is empty`. Without the
+guard, the error would be `IndexError` with no name in it.
 
 `n_head` must divide `n_embd`. If it does not, `n_embd // n_head` rounds
 down. The last `n_embd % n_head` elements of every vector would then belong

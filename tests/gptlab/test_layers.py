@@ -57,6 +57,12 @@ def test_dot_rejects_vectors_of_different_length() -> None:
         dot(x=_nodes(values=[1.0, 2.0]), y=_nodes(values=[1.0, 2.0, 3.0]))
 
 
+def test_dot_rejects_an_empty_vector() -> None:
+    # The seeded loop reads x[0]. The guard says which vector is empty.
+    with pytest.raises(ValueError):
+        dot(x=_nodes(values=[]), y=_nodes(values=[]))
+
+
 def test_dot_graph_holds_only_the_named_operations() -> None:
     # x0 * y0 + x1 * y1 is 4 leaves, 2 products, 1 sum: 7 nodes.
     # Builtin sum would add a leaf for the float 0 and one more sum: 9 nodes.
@@ -147,6 +153,13 @@ def test_softmax_returns_nodes() -> None:
     assert all(isinstance(pi, Node) for pi in p)
 
 
+def test_softmax_rejects_an_empty_vector() -> None:
+    # max() of nothing would raise first, with a message about max, not
+    # about logits. The guard names the vector.
+    with pytest.raises(ValueError):
+        softmax(logits=_nodes(values=[]))
+
+
 # --- Group 4: rmsnorm (Section 6) --------------------------------------------
 
 
@@ -201,6 +214,12 @@ def test_rmsnorm_output_length_matches_input() -> None:
 def test_rmsnorm_returns_nodes() -> None:
     y = rmsnorm(x=_nodes(values=[1.0, 2.0]))
     assert all(isinstance(yi, Node) for yi in y)
+
+
+def test_rmsnorm_rejects_an_empty_vector() -> None:
+    # The seeded loop reads squares[0]. The guard says x is empty.
+    with pytest.raises(ValueError):
+        rmsnorm(x=_nodes(values=[]))
 
 
 # --- Group 5: transpose (Section 7) ------------------------------------------

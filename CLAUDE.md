@@ -145,8 +145,9 @@ Conventions to follow through out the code.
   the closures, but `Node.__init__` still has the `*`. A closure in a test
   that stands in for `propagate` carries `# noqa: PLR0917`.
 - No shape check where a strict `zip` already raises `ValueError`. A guard
-  is added only where the error message can say more than `zip` can, as
-  the `n_head` guard in `attention` does.
+  is added only where the error message can say more than the free error
+  can, as the `n_head` guard in `attention` does, and as the `is empty`
+  guard does in every function that reads element zero of an input.
 - A plain float that does not need a gradient stays a float (the softmax
   shift, the attention scale).
 - The residual connection and normalization live in `model`, not in the

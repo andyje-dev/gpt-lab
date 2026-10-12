@@ -91,10 +91,13 @@ A row is one output because `linear` takes the dot product of `x` with one
 row at a time. If a column were one output, the loop would need an index
 into every row.
 
-The code does not check shapes before it starts. The model controls its own
-shapes. The one guard is in `dot`, and section 3 describes it. `linear`
-passes each row through it, so a row that is longer or shorter than `x`
-raises `ValueError`.
+The code checks one thing before it starts: that the input has at least
+one element. Every seeded sum reads element zero, so an empty input would
+raise `IndexError` with no name in the message. The guard raises
+`ValueError` and names the empty input. It does not check shapes. The model
+controls its own shapes. The shape guard is in `dot`, and section 3
+describes both guards. `linear` passes each row through `dot`, so a row
+that is longer or shorter than `x` raises `ValueError`.
 
 The running sums use `+=`. The node class has no **in-place** add, so Python
 runs `total = total + item` and binds the name to a new node. No node is
@@ -156,17 +159,28 @@ and one more thing for a reader to explain. Thus, the code starts from the
 first product and adds the rest in a loop. The graph then holds only the
 operations that the formula names.
 
-One consequence: a seeded loop needs at least one element. An empty vector
-raises at the seed. The sums in `softmax` and `rmsnorm` are seeded in the
-same way. Thus, every function in this module that makes nodes needs a
-vector with at least one element.
+One consequence: a seeded loop needs at least one element. The sums in
+`softmax` and `rmsnorm` are seeded in the same way. Thus, every function
+in this module that makes nodes needs a vector with at least one element,
+and each one guards it. The guard is the first line of the function.
 
-### The guard
+### The guards
 
-The `zip` over `x` and `y` has `strict=True`. By default, `zip` stops at
-the shorter list and raises nothing. Without the flag, two vectors of
-different lengths would give a wrong number and no error. With the flag, it
-raises `ValueError`. The flag makes no node, so the graph is the same.
+`dot` has two guards.
+
+The first is a line of code. If `x` is empty, the seed `x[0]` would raise
+`IndexError` with the message `list index out of range`. That message does
+not say which list. The guard raises `ValueError` with the message
+`x is empty`. By the convention, a guard earns its place only when its
+message says more than the free error does. This one does. `softmax`,
+`rmsnorm`, `split_heads`, `attention`, and `sequence_loss` have the same
+guard for the same reason.
+
+The second is a flag. The `zip` over `x` and `y` has `strict=True`. By
+default, `zip` stops at the shorter list and raises nothing. Without the
+flag, two vectors of different lengths would give a wrong number and no
+error. With the flag, it raises `ValueError`. The flag makes no node, so
+the graph is the same.
 
 ### The backward pass through dot
 
@@ -193,7 +207,7 @@ y[i] = dot(x=x, y=w[i])
 The code is one comprehension over the rows of `w`. There is one output per
 row. The comprehension makes no node of its own. `dot` makes every node in
 the graph of `linear`. Thus, the graph of one output is the graph of
-section 3, and the guard of section 3 checks each row against `x`.
+section 3, and the `zip` guard of section 3 checks each row against `x`.
 
 There is no bias term. A bias adds one parameter, one leaf, and one sum node
 per output. The base model trains without it, so the baseline keeps the
