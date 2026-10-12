@@ -51,9 +51,9 @@ vector has one score per position up to the current one, so its length
 changes with the position. In the loss, the vector has one logit per token
 in the vocabulary, and the next operation is `log` of one element.
 
-These functions are one module because they are shared, or because they
-are too small to be worth a module and too easy to get wrong to be written
-inline. One module and one test file prove each function one time. The
+These functions are one module for two reasons. Most of them have more
+than one caller. The rest are too small for a module of their own, and too
+easy to get wrong inline. One module and one test file prove each function one time. The
 callers then build on functions that are already tested.
 
 Each function is a pure function. It takes its inputs as arguments, makes
@@ -126,9 +126,9 @@ graph TD
     p1 --> y1["y1"]
 ```
 
-This is the one place in the module where a vector is reduced to a number.
-`linear` calls it once per row. Attention calls it once per score. Both
-callers get the same graph from the same tested loop.
+This is the one place in the module that reduces a vector to a number.
+`linear` calls it one time per row. Attention calls it one time per score.
+Both callers get the same graph from the same tested loop.
 
 ### Why a loop and not `sum`
 
@@ -139,9 +139,11 @@ starts.
 left operand is an `int`. Python asks `int.__add__` first. It does not know
 the node class, so it returns `NotImplemented`. Python then asks the right
 operand: `items[0].__radd__(0)`. That calls `__add__`, and the first line of
-`__add__` wraps `0` in a new leaf node. The result is one extra node per
-dot product. Its forward value equals the first product. Its children are
-the first product and a leaf with value `0`.
+`__add__` wraps `0` in a new leaf node.
+
+The result is one extra node per dot product. Its forward value equals the
+first product. Its children are the first product and a leaf with value
+`0`.
 
 This extra node is **harmless**:
 
@@ -149,21 +151,21 @@ This extra node is **harmless**:
   the same gradient with or without the extra node.
 - The leaf with value `0` also receives a gradient. No code reads it.
 
-The extra node is also **waste**. It is one dead node per dot product, and
-one more thing for a reader to explain. Thus, the code starts from the
+The extra node is also **waste**. It is one unused node per dot product,
+and one more thing for a reader to explain. Thus, the code starts from the
 first product and adds the rest in a loop. The graph then holds only the
 operations that the formula names.
 
 One consequence: a seeded loop needs at least one element. An empty vector
 raises at the seed. The sums in `softmax` and `rmsnorm` are seeded in the
-same way, so every function in this module that makes nodes needs a vector
-with at least one element.
+same way. Thus, every function in this module that makes nodes needs a
+vector with at least one element.
 
 ### The guard
 
 The `zip` over `x` and `y` has `strict=True`. By default, `zip` stops at
 the shorter list and raises nothing. Without the flag, two vectors of
-different length would give a wrong number and no error. With the flag, it
+different lengths would give a wrong number and no error. With the flag, it
 raises `ValueError`. The flag makes no node, so the graph is the same.
 
 ### The backward pass through dot
@@ -189,8 +191,8 @@ y[i] = dot(x, w[i])
 ```
 
 The code is one comprehension over the rows of `w`. There is one output per
-row. The comprehension makes no node of its own. Every node in the graph of
-`linear` is made by `dot`, so the graph of one output is the graph of
+row. The comprehension makes no node of its own. `dot` makes every node in
+the graph of `linear`. Thus, the graph of one output is the graph of
 section 3, and the guard of section 3 checks each row against `x`.
 
 There is no bias term. A bias adds one parameter, one leaf, and one sum node
@@ -349,8 +351,8 @@ elements becomes a matrix with `C` rows of `R` elements.
 The code is `zip(*m, strict=True)`. The star passes each row of `m` as a
 separate argument to `zip`. `zip` then yields one tuple per column: the
 first elements of every row, then the second elements, and so on. The
-comprehension turns each tuple into a list, so the result is a `Matrix` and
-not a list of tuples.
+comprehension turns each tuple into a list. Thus, the result is a `Matrix`
+and not a list of tuples.
 
 ### No node is made
 
@@ -363,19 +365,21 @@ do, and nothing for a gradient check to prove.
 ### Why attention needs it
 
 Section 2 says that a row of a weight matrix is one output, and that
-`linear` pairs the input with each row. Attention has the other case. It
-holds the values of the positions read so far as a matrix with one row per
-**position**. It needs one output per **element**, each a weighted sum over
-the positions. The rows are the wrong way round for `linear`. A transpose
-turns them the right way round, and the weighted sum is then
-`linear(weights, transpose(values))`. Section 5 of `docs/ATTENTION.md`
+`linear` pairs the input with each row. Attention has the opposite case. It
+holds the values of the positions that it has read as a matrix with one row
+per **position**. It needs one output per **element**, and each output is a
+weighted sum over the positions.
+
+The rows are in the wrong direction for `linear`. A transpose turns them in
+the correct direction. The weighted sum is then
+`linear(weights, transpose(values))`. Section 2 of `docs/ATTENTION.md`
 gives the full argument.
 
 ### The guard
 
 `strict=True` raises `ValueError` if the rows do not all have the same
-length. Without the flag, `zip` stops at the shortest row and drops the
-tail of every longer row. The result would have the wrong shape and no
+length. Without the flag, `zip` stops at the shortest row and discards the
+end of every longer row. The result would have the wrong shape and no
 error. This is the same decision as in `dot`: a wrong shape is an error,
 not a wrong number.
 
@@ -398,10 +402,10 @@ Five points are specific to this module:
   distinct coefficients. A plain sum would not do. The plain sum of a
   softmax is always 1, so every gradient through it would be zero, and the
   test would prove nothing. `dot` returns one node, so it is its own loss.
-- `linear` has its own case even though every node in it comes from `dot`.
-  Its float reference is perturbed in `w` as well as in `x`, so the match
-  proves `dL/dw`, which is the number the optimizer reads, and proves the
-  accumulation across rows of section 4.
+- `linear` has its own case, although every node in it comes from `dot`.
+  The test perturbs its float reference in `w` as well as in `x`. Thus,
+  the match proves `dL/dw`, which is the number the optimizer reads. It
+  also proves the accumulation across rows of section 4.
 - `transpose` is not in this group. It makes no node, so it has no gradient
   of its own. Group 5 proves it by object identity instead.
 - The float reference for each function is written in the test with `math`.
@@ -410,7 +414,7 @@ Five points are specific to this module:
 - Two claims from earlier sections rest on this group. The float reference
   for `softmax` has no shift, so the match in value and in gradient proves
   that the shift of section 5 is exact. The float reference for `dot` is
-  the plain `sum` that section 3 rejects, so the match proves that the
+  the plain `sum` that section 3 rejects. Thus, the match proves that the
   seeded loop and builtin `sum` give the same gradient.
 
 A gradient check proves that the backward pass matches the forward pass. It
