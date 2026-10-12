@@ -16,10 +16,12 @@ from gptlab.autograd import Node
 
 
 def _nodes(values: list[float]) -> list[Node]:
+    """Return one leaf Node for each float."""
     return [Node(v) for v in values]
 
 
 def _values(nodes: list[Node]) -> list[float]:
+    """Return the forward value of each Node."""
     return [n.forward_val for n in nodes]
 
 
@@ -109,6 +111,7 @@ def test_softmax_returns_nodes() -> None:
 
 
 def _rms(values: list[float]) -> float:
+    """Return the root-mean-square of the floats."""
     return math.sqrt(sum(v * v for v in values) / len(values))
 
 
@@ -178,6 +181,18 @@ COEFFS = [0.3, -1.2, 2.0]
 
 
 def _weighted(outputs: list, coeffs: list[float]):
+    """Return the weighted sum of the outputs.
+
+    The sum turns a layer output into a scalar loss for a gradient check.
+
+    Args:
+        outputs: The layer outputs, as floats or as Nodes.
+        coeffs: One coefficient for each output. The coefficients are fixed
+            and distinct.
+
+    Returns:
+        A scalar of the same kind as the outputs.
+    """
     total = outputs[0] * coeffs[0]
     for out, c in zip(outputs[1:], coeffs[1:]):
         total = total + out * c
@@ -191,31 +206,37 @@ def _weighted(outputs: list, coeffs: list[float]):
 
 
 def _linear_node_loss(v: list[Node]) -> Node:
+    """Return the weighted loss of ``linear`` for 3 inputs and 2 rows of weights."""
     x, w = v[:3], [v[3:6], v[6:9]]
     return _weighted(layers.linear(x, w), COEFFS[:2])
 
 
 def _linear_float_loss(v: list[float]) -> float:
+    """Return the same loss as ``_linear_node_loss`` with floats only."""
     x, w = v[:3], [v[3:6], v[6:9]]
     y = [sum(xi * wi for xi, wi in zip(x, row)) for row in w]
     return _weighted(y, COEFFS[:2])
 
 
 def _softmax_node_loss(v: list[Node]) -> Node:
+    """Return the weighted loss of ``softmax``."""
     return _weighted(layers.softmax(v), COEFFS)
 
 
 def _softmax_float_loss(v: list[float]) -> float:
+    """Return the same loss as ``_softmax_node_loss`` with floats only."""
     exps = [math.exp(vi) for vi in v]
     total = sum(exps)
     return _weighted([e / total for e in exps], COEFFS)
 
 
 def _rmsnorm_node_loss(v: list[Node]) -> Node:
+    """Return the weighted loss of ``rmsnorm``."""
     return _weighted(layers.rmsnorm(v), COEFFS)
 
 
 def _rmsnorm_float_loss(v: list[float]) -> float:
+    """Return the same loss as ``_rmsnorm_node_loss`` with floats only."""
     scale = (sum(vi * vi for vi in v) / len(v) + 1e-5) ** -0.5
     return _weighted([vi * scale for vi in v], COEFFS)
 

@@ -141,6 +141,7 @@ G = 2.5  # incoming gradient dL/dc; must be multiplied, not ignored
 
 
 def _seeded(*nodes: Node) -> None:
+    """Set the gradient of each node to SEED before a propagate call."""
     for n in nodes:
         n.gradient = SEED
 
@@ -359,26 +360,50 @@ TOL = 1e-6
 
 
 def _exp(x: float | Node) -> float | Node:
+    """Return exp(x) for a float or a Node."""
     return x.exp() if isinstance(x, Node) else math.exp(x)
 
 
 def _log(x: float | Node) -> float | Node:
+    """Return log(x) for a float or a Node."""
     return x.log() if isinstance(x, Node) else math.log(x)
 
 
 def _relu(x: float | Node) -> float | Node:
+    """Return max(0, x) for a float or a Node."""
     return x.relu() if isinstance(x, Node) else max(0.0, x)
 
 
 def _loss_arithmetic(a: float | Node, b: float | Node) -> float | Node:
-    # Uses every operator: +, *, **, -, /, unary -, and float on both sides.
+    """Return a loss that uses each arithmetic operator one time or more.
+
+    The expression uses +, *, **, -, /, unary -, and a float on both sides
+    of an operator.
+
+    Args:
+        a: The first input, as a float or a Node.
+        b: The second input, as a float or a Node.
+
+    Returns:
+        A scalar of the same kind as the inputs.
+    """
     return (a * b - 2.0) / (a**2 + 1.0) + (3.0 - b) * -a + 1.0 / b
 
 
 def _loss_nonlinear(a: float | Node, b: float | Node) -> float | Node:
-    # A two-class softmax cross-entropy with a as the target logit, plus a
-    # ReLU term. Uses exp, log, and relu in the shape the model will use them.
-    # a * b is never near 0 for the sample points, so the ReLU kink is avoided.
+    """Return a two-class softmax cross-entropy plus a ReLU term.
+
+    The target logit is ``a``. The loss uses exp, log, and relu in the shape
+    that the model will use them. The product ``a * b`` is never near zero at
+    the sample points, so the test does not touch the kink of ReLU.
+
+    Args:
+        a: The target logit, as a float or a Node.
+        b: The other logit, as a float or a Node.
+
+    Returns:
+        A scalar of the same kind as the inputs.
+    """
     p = _exp(a) / (_exp(a) + _exp(b))
     return -_log(p) + _relu(a * b)
 

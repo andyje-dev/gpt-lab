@@ -1,8 +1,8 @@
 """Layer functions: linear, softmax, rmsnorm.
 
-Each function takes a list of nodes and returns a list of nodes. Every node
-is made by a scalar operation from the autograd engine, so the backward pass
-needs nothing new. Design notes and the reasoning behind each choice are in
+Each function takes a list of nodes and returns a list of nodes. The scalar
+operations of the autograd engine make each output node, so the backward pass
+needs nothing new. The design notes and the reason for each choice are in
 docs/LAYERS.md.
 """
 
@@ -13,7 +13,20 @@ Matrix = list[list[Node]]
 
 
 def linear(x: Vector, w: Matrix) -> Vector:
-    """Return the dot product of x with each row of w. No bias."""
+    """Return the dot product of ``x`` with each row of ``w``.
+
+    There is no bias term.
+
+    Args:
+        x: The input vector. It must have at least one node.
+        w: The weight matrix. Each row must have the same length as ``x``.
+
+    Returns:
+        A vector with one node for each row of ``w``.
+
+    Raises:
+        ValueError: If a row of ``w`` does not have the same length as ``x``.
+    """
     outputs: Vector = []
 
     for row in w:
@@ -28,8 +41,16 @@ def linear(x: Vector, w: Matrix) -> Vector:
 def softmax(logits: Vector) -> Vector:
     """Return a probability distribution over the logits.
 
-    The largest logit is subtracted as a plain float before exp, so exp
-    cannot overflow. The shift cancels in the division and is not a node.
+    The function subtracts the largest logit as a plain float before it
+    applies exp. This prevents overflow. The shift cancels in the division,
+    so it is not a node and it receives no gradient.
+
+    Args:
+        logits: The input vector. It must have at least one node.
+
+    Returns:
+        A vector with the same length as ``logits``. Each node is between
+        zero and one. The nodes sum to one.
     """
     max_logit = max(logit.forward_val for logit in logits)
 
@@ -46,10 +67,19 @@ def softmax(logits: Vector) -> Vector:
 
 
 def rmsnorm(x: Vector, eps: float = 1e-5) -> Vector:
-    """Divide each element by the root-mean-square of x. No learned scale.
+    """Divide each element of ``x`` by the root-mean-square of ``x``.
 
-    eps is inside the root, so a zero vector gives zeros with no division
-    by zero in the forward or the backward pass.
+    There is no learned scale. The ``eps`` term is inside the root. A zero
+    vector gives zeros, and there is no division by zero in the forward pass
+    or in the backward pass.
+
+    Args:
+        x: The input vector. It must have at least one node.
+        eps: A small constant. The function adds it to the mean square
+            before the square root. The default is 1e-5.
+
+    Returns:
+        A vector with the same length as ``x``.
     """
     squares: Vector = [xi**2 for xi in x]
 
