@@ -9,7 +9,7 @@ docs/LAYERS.md.
 from gptlab.autograd import Node
 
 Vector = list[Node]
-Matrix = list[list[Node]]
+Matrix = list[Vector]
 
 
 def linear(x: Vector, w: Matrix) -> Vector:

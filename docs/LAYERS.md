@@ -79,8 +79,8 @@ A layer takes a list of numbers and returns a list of numbers. In this
 project each number is a node. Thus:
 
 - A **vector** is `list[Node]`.
-- A **matrix** is `list[list[Node]]`. It is a list of rows. Each row is a
-  vector.
+- A **matrix** is `list[Vector]`, which is `list[list[Node]]`. It is a list
+  of rows. Each row is a vector.
 
 `Vector` and `Matrix` are type aliases. The type checker uses them to find
 a vector passed where a matrix is expected, or a float passed where a node
