@@ -1,13 +1,13 @@
 # Autograd: Design Notes
 
-> Code: `src/gptlab/autograd.py`
-> Tests: `tests/gptlab/test_autograd.py`
+> Code: [`src/gptlab/autograd.py`](../src/gptlab/autograd.py)
+> Tests: [`tests/gptlab/test_autograd.py`](../tests/gptlab/test_autograd.py)
 
 ---
 
 ## Contents
 
-- [How to read this document](#how-to-read-this-document)
+- [Words in this document](#words-in-this-document)
 - [1. The problem](#1-the-problem)
 - [2. The Node](#2-the-node)
 - [3. The graph](#3-the-graph)
@@ -20,17 +20,7 @@
 - [10. Check the gradients with numbers](#10-check-the-gradients-with-numbers)
 
 
-## How to read this document
-
-The sections of this document follow the order of the code. Read one
-section. Then read the code that the section names. No section depends 
-on a later section.
-
-Each numbered section starts with two lines:
-
-- `Code:` names the method or attribute that the section explains.
-- `Tests:` names the test group that holds the section in place. A comment
-  at the top of each test group points back to the section.
+## Words in this document
 
 The text uses plain words for the attributes of the node class. This table
 gives the code name for each word:
@@ -69,7 +59,7 @@ Thus, we make a node class. Each scalar in the model is a node. Each node
 holds these fields:
 
 | Field              | Attribute     | Purpose                                                     |
-|--------------------|---------------|-------------------------------------------------------------|
+| ------------------ | ------------- | ----------------------------------------------------------- |
 | forward value      | `forward_val` | the number computed in the forward pass                     |
 | gradient slot      | `gradient`    | dL/d(this value), filled in during backprop, starts at zero |
 | children           | `children`    | pointers to the values that produced this one               |
@@ -346,21 +336,21 @@ Only the six primitives of section 6 have propagate functions. The other
 operators are built from these. Each combination makes one or more nodes in
 the graph, each with its own children and propagate function.
 
-| Expression | Method          | Body                            |
-|------------|-----------------|---------------------------------|
-| `a + b`    | `__add__`       | primitive                       |
-| `a * b`    | `__mul__`       | primitive                       |
-| `a ** 2`   | `__pow__`       | primitive, number exponent only |
-| `a.exp()`  | `exp`           | primitive                       |
-| `a.log()`  | `log`           | primitive                       |
-| `a.relu()` | `relu`          | primitive                       |
-| `2.0 + a`  | `__radd__`      | `self + other`                  |
-| `2.0 * a`  | `__rmul__`      | `self * other`                  |
-| `-a`       | `__neg__`       | `self * -1`                     |
-| `a - b`    | `__sub__`       | `self + (-other)`               |
-| `2.0 - a`  | `__rsub__`      | `(-self) + other`               |
-| `a / b`    | `__truediv__`   | `self * other ** -1`            |
-| `2.0 / a`  | `__rtruediv__`  | `other * self ** -1`            |
+| Expression | Method         | Body                            |
+|------------|----------------|---------------------------------|
+| `a + b`    | `__add__`      | primitive                       |
+| `a * b`    | `__mul__`      | primitive                       |
+| `a ** 2`   | `__pow__`      | primitive, number exponent only |
+| `a.exp()`  | `exp`          | primitive                       |
+| `a.log()`  | `log`          | primitive                       |
+| `a.relu()` | `relu`         | primitive                       |
+| `2.0 + a`  | `__radd__`     | `self + other`                  |
+| `2.0 * a`  | `__rmul__`     | `self * other`                  |
+| `-a`       | `__neg__`      | `self * -1`                     |
+| `a - b`    | `__sub__`      | `self + (-other)`               |
+| `2.0 - a`  | `__rsub__`     | `(-self) + other`               |
+| `a / b`    | `__truediv__`  | `self * other ** -1`            |
+| `2.0 / a`  | `__rtruediv__` | `other * self ** -1`            |
 
 Note on `__pow__`: the exponent is a plain number, not a node. A node
 exponent would need a different local derivative (it includes the log of the

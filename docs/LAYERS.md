@@ -1,13 +1,12 @@
 # Layers: Design Notes
 
-> Code: `src/gptlab/layers.py`
-> Tests: `tests/gptlab/test_layers.py`
+> Code: [`src/gptlab/layers.py`](../src/gptlab/layers.py)
+> Tests: [`tests/gptlab/test_layers.py`](../tests/gptlab/test_layers.py)
 
 ---
 
 ## Contents
 
-- [How to read this document](#how-to-read-this-document)
 - [1. The problem](#1-the-problem)
 - [2. Vectors and matrices as lists](#2-vectors-and-matrices-as-lists)
 - [3. Linear](#3-linear)
@@ -15,24 +14,6 @@
 - [5. RMSNorm](#5-rmsnorm)
 - [6. Check the gradients with numbers](#6-check-the-gradients-with-numbers)
 
-
-## How to read this document
-
-Read `docs/AUTOGRAD.md` first. The words "node", "leaf", "children", 
-and "propagate function" have the meaning given there. "Scalar operation" 
-means one of the operators in sections 6 and 7 of that document.
-
-A section number with no document name points to this document. A reference
-to the another document always names it.
-
-The sections of this document follow the order of the code. Read one
-section. Then read the code that the section names. 
-
-Each numbered section starts with two lines:
-
-- `Code:` names the function or alias that the section explains.
-- `Tests:` names the test group that holds the section in place. A comment
-  at the top of each test group points back to the section.
 
 ## 1. The problem
 
@@ -47,11 +28,11 @@ hold no logic of their own:
 
 Each one is called from more than one place in the model:
 
-| Function  | Called by                                                                                       |
-|-----------|-------------------------------------------------------------------------------------------------|
+| Function  | Called by                                                                                                                      |
+|-----------|--------------------------------------------------------------------------------------------------------------------------------|
 | `linear`  | Attention, for the query, key, value, and output projections. The MLP, for both of its layers. The model, for the output head. |
-| `softmax` | Attention, over the scores of one position. The loss, over the vocabulary, before `log`.        |
-| `rmsnorm` | The model, after the embeddings, before each attention block, before each MLP block, and after the last block. |
+| `softmax` | Attention, over the scores of one position. The loss, over the vocabulary, before `log`.                                       |
+| `rmsnorm` | The model, after the embeddings, before each attention block, before each MLP block, and after the last block.                 |
 
 The two callers of `softmax` give it different inputs. In attention, the
 vector has one score per position up to the current one, so its length
