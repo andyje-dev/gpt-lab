@@ -2,9 +2,9 @@
 
 Each test group maps to a section of docs/ATTENTION.md.
 
-The module is imported as a whole, not by name. The file works as a TDD
-target: every test fails until the function it calls exists, then each test
-fails or passes on its own.
+The functions are imported by name. Until all three exist, the import fails
+and pytest reports one collection error. Once they exist, each test fails
+or passes on its own.
 """
 
 import math
@@ -12,7 +12,7 @@ import random
 
 import pytest
 
-from gptlab import attention
+from gptlab.attention import attend, attention, split_heads
 from gptlab.autograd import Node
 from gptlab.layers import Matrix, Vector
 
@@ -130,7 +130,7 @@ def _case(seed: int = 0):
 
 def _run(x, wq, wk, wv, wo, n_head: int = N_HEAD) -> Matrix:
     """Build Nodes from the floats and run the module under test."""
-    return attention.attention(
+    return attention(
         [_nodes(xi) for xi in x],
         _matrix(wq),
         _matrix(wk),
@@ -152,7 +152,7 @@ V_VALS = [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]
 
 def _attend(q, keys, values, scale: float = 1.0) -> Vector:
     """Build Nodes from the floats and run ``attend``."""
-    return attention.attend(_nodes(q), _matrix(keys), _matrix(values), scale)
+    return attend(_nodes(q), _matrix(keys), _matrix(values), scale)
 
 
 def test_attend_matches_hand_computed_case() -> None:
@@ -218,12 +218,12 @@ HEAD_VALS = [[[1.0, 2.0], [5.0, 6.0]], [[3.0, 4.0], [7.0, 8.0]]]
 
 
 def test_split_heads_matches_hand_computed_case() -> None:
-    heads = attention.split_heads(_matrix(M_VALS), n_head=2)
+    heads = split_heads(_matrix(M_VALS), n_head=2)
     assert [[_values(row) for row in head] for head in heads] == HEAD_VALS
 
 
 def test_split_heads_shape_is_heads_by_rows_by_head_dim() -> None:
-    heads = attention.split_heads(_matrix(M_VALS), n_head=2)
+    heads = split_heads(_matrix(M_VALS), n_head=2)
     assert len(heads) == 2
     assert all(len(head) == 2 for head in heads)
     assert all(len(row) == 2 for head in heads for row in head)
@@ -232,7 +232,7 @@ def test_split_heads_shape_is_heads_by_rows_by_head_dim() -> None:
 def test_split_heads_makes_no_node() -> None:
     # Section 3: a slice holds the same node objects as the row it came from.
     m = _matrix(M_VALS)
-    heads = attention.split_heads(m, n_head=2)
+    heads = split_heads(m, n_head=2)
     for h, head in enumerate(heads):
         for r, row in enumerate(head):
             for t, node in enumerate(row):
@@ -241,7 +241,7 @@ def test_split_heads_makes_no_node() -> None:
 
 def test_split_heads_with_one_head_is_the_whole_matrix() -> None:
     m = _matrix(M_VALS)
-    (head,) = attention.split_heads(m, n_head=1)
+    (head,) = split_heads(m, n_head=1)
     assert head == m
 
 
@@ -368,7 +368,7 @@ def _weighted(outputs: list[list], coeffs: list[float]):
 def _node_loss(v: Vector) -> Node:
     """Return the weighted loss of the module under test."""
     x, wq, wk, wv, wo = _unpack(v)
-    return _weighted(attention.attention(x, wq, wk, wv, wo, n_head=N_HEAD), COEFFS)
+    return _weighted(attention(x, wq, wk, wv, wo, n_head=N_HEAD), COEFFS)
 
 
 def _float_loss(v: list[float]) -> float:

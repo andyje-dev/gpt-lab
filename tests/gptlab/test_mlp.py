@@ -2,18 +2,18 @@
 
 Each test group maps to a section of docs/MLP.md.
 
-The module is imported as a whole, not by name. The file works as a TDD
-target: every test fails until the function it calls exists, then each test
-fails or passes on its own.
+The function is imported by name. Until it exists, the import fails and
+pytest reports one collection error. Once it exists, each test fails or
+passes on its own.
 """
 
 import random
 
 import pytest
 
-from gptlab import mlp
 from gptlab.autograd import Node
 from gptlab.layers import Matrix, Vector
+from gptlab.mlp import mlp
 
 
 def _nodes(values: list[float]) -> Vector:
@@ -81,7 +81,7 @@ def _case(seed: int = 0):
 
 def _run(x, fc1, fc2) -> Vector:
     """Build Nodes from the floats and run the module under test."""
-    return mlp.mlp(_nodes(x), _matrix(fc1), _matrix(fc2))
+    return mlp(_nodes(x), _matrix(fc1), _matrix(fc2))
 
 
 # --- Group 1: shape (Section 2) ----------------------------------------------
@@ -144,7 +144,7 @@ def test_cut_unit_passes_no_gradient_to_its_weights() -> None:
     # The second row of fc1 feeds only the cut unit. ReLU sends no gradient
     # through a unit that is at or below zero, so those weights get zero.
     x, fc1, fc2 = _nodes(X_VALS), _matrix(FC1_VALS), _matrix(FC2_VALS)
-    y = mlp.mlp(x, fc1, fc2)
+    y = mlp(x, fc1, fc2)
     (y[0] + y[1]).backward()
     assert [w.gradient for w in fc1[1]] == [0.0, 0.0]
 
@@ -154,7 +154,7 @@ def test_live_unit_passes_gradient_to_its_weights() -> None:
     # is x scaled by the weight fc2 gives that unit: fc2[0][0] + fc2[1][0]
     # = 1, so the gradient is x itself.
     x, fc1, fc2 = _nodes(X_VALS), _matrix(FC1_VALS), _matrix(FC2_VALS)
-    y = mlp.mlp(x, fc1, fc2)
+    y = mlp(x, fc1, fc2)
     (y[0] + y[1]).backward()
     assert [w.gradient for w in fc1[0]] == pytest.approx(X_VALS)
 
@@ -212,7 +212,7 @@ def _weighted(outputs: list, coeffs: list[float]):
 def _node_loss(v: Vector) -> Node:
     """Return the weighted loss of the module under test."""
     x, fc1, fc2 = _unpack(v)
-    return _weighted(mlp.mlp(x, fc1, fc2), COEFFS)
+    return _weighted(mlp(x, fc1, fc2), COEFFS)
 
 
 def _float_loss(v: list[float]) -> float:
