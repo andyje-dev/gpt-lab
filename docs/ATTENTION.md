@@ -234,7 +234,7 @@ row. Position `i` reads itself and every position before it. It never
 reads a later position, because `attend` never sees one.
 
 A common alternative computes every score for every pair. It then sets the
-scores for $j > i$ to minus infinity before `softmax`. `exp` of minus
+scores for $j \gt i$ to minus infinity before `softmax`. `exp` of minus
 infinity is zero, so those positions receive a weight of zero. The result
 is the same.
 
@@ -286,5 +286,5 @@ computes the first mix from the content on every call.
 
 With one position, every call of `attend` receives one key, and section 2
 says that the output is then the one value. The output of `attention` is
-$\texttt{wo}\,(\texttt{wv}\, x_0)$, and `wq` and `wk` have no effect. A position with
+$\texttt{wo} (\texttt{wv} x_0)$, and `wq` and `wk` have no effect. A position with
 nothing to choose between has no use for a query or a key.

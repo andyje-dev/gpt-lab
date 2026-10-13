@@ -228,7 +228,7 @@ def propagate(g: float) -> None:
 ### 6.3 Multiplication: $c = ab$
 
 - $dc/da = b$, $dc/db = a$
-- $c$ sends $(dL/dc)\, b$ to $a$. $c$ sends $(dL/dc)\, a$ to $b$.
+- $c$ sends $(dL/dc) b$ to $a$. $c$ sends $(dL/dc) a$ to $b$.
 - $c$ must keep a reference to each child. $a$ alone does not know the
   value of $b$.
 
@@ -242,7 +242,7 @@ def propagate(g: float) -> None:
 
 - $n$ is a plain number, not a node. It is fixed during the forward pass.
 - $dc/da = n a^{n-1}$ (the power rule).
-- $c$ sends $(dL/dc)\, n a^{n-1}$ to $a$. There is one child, so
+- $c$ sends $(dL/dc) n a^{n-1}$ to $a$. There is one child, so
   there is one send.
 - $c$ must keep a reference to $a$ and must also keep the number $n$. $n$ is
   not a child. It is not in the graph. The propagate function must capture
@@ -258,7 +258,7 @@ def propagate(g: float) -> None:
 ### 6.5 Exponent: $c = \exp(a)$
 
 - $dc/da = \exp(a)$. This is the value of $c$ itself.
-- $c$ sends $(dL/dc)\, c$ to $a$.
+- $c$ sends $(dL/dc) c$ to $a$.
 - The propagate function needs only the forward value of $c$. The forward
   pass already computed it. Nothing is computed twice. In the code, the
   forward value is held in `result` before the function is written.
@@ -295,12 +295,12 @@ def propagate(g: float) -> None:
 
 ### 6.7 ReLU: $c = \max(0, a)$
 
-- $dc/da = 1$ if $a > 0$, else $0$.
-- $c$ sends $dL/dc$ to $a$ when $a > 0$. It sends nothing when $a \le 0$.
+- $dc/da = 1$ if $a \gt 0$, else $0$.
+- $c$ sends $dL/dc$ to $a$ when $a \gt 0$. It sends nothing when $a \le 0$.
 - At $a = 0$ the derivative is not defined. We choose $0$. A float lands
   on exactly $0$ almost never, so the choice has no effect in practice.
 - The MLP clamps against the constant `0`.
-- The propagate function needs the forward value of $a$. The test $c > 0$
+- The propagate function needs the forward value of $a$. The test $c \gt 0$
   gives the same answer, so the forward value of $c$ works too.
 
 ```python

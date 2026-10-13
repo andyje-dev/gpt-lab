@@ -193,7 +193,7 @@ sections 6.2 and 6.3 of `docs/AUTOGRAD.md`:
 - Each `+` sends the gradient of $d$ unchanged to both of its children.
   Thus, every product in the chain receives the full gradient of $d$. Call
   it $g$.
-- Each product $x_j y_j$ sends $g\, y_j$ to $x_j$ and $g\, x_j$ to $y_j$.
+- Each product $x_j y_j$ sends $g y_j$ to $x_j$ and $g x_j$ to $y_j$.
 
 ## 4. Linear
 
@@ -347,7 +347,7 @@ finite.
 
 The backward pass is also finite. The local derivative of the power node is
 $-\tfrac{1}{2} \epsilon^{-3/2}$. This is large but finite. It is multiplied by
-the gradient that reaches the power node, and that gradient is $g\, x_i$
+the gradient that reaches the power node, and that gradient is $g x_i$
 from each product, which is zero. Thus, nothing reaches the mean or the
 squares. Each $x_i$ receives $316 g$. Nothing is infinite and nothing is NaN.
 

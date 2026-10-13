@@ -124,7 +124,7 @@ Take the derivative with respect to logit $i$:
 So:
 
 $$
-\frac{d\,\text{loss}}{dx_i} = p_i - [i = t]
+\frac{d\ \text{loss}}{dx_i} = p_i - [i = t]
 $$
 
 The bracket $[i = t]$ is $1$ when $i$ is the target and $0$ otherwise.

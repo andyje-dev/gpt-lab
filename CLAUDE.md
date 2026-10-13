@@ -234,11 +234,23 @@ explanations when the user is lost.
 - Present tense. "The code calls it once per pre-activation."
 - Code names in backticks. Formulas in LaTeX: a display formula in a `$$`
   block on its own lines, a formula inside a sentence in `$...$`. A code
-  name inside a formula is `\texttt{}`. Never put an underscore inside a
-  formula: GitHub strips the backslash of `\_`, and MathJax rejects a bare
-  underscore in text mode. A code name with an underscore becomes a letter
-  with a subscript, by the table in `docs/README.md` (`n_embd` is
-  `$n_{\text{embd}}$`). Pseudocode and Python stay in fenced blocks.
+  name inside a formula is `\texttt{}`. Pseudocode and Python stay in
+  fenced blocks. GitHub runs Markdown escapes and emphasis over a formula
+  before MathJax sees it, so five rules keep every formula renderable:
+  1. No backslash before punctuation inside a formula. `\_` and `\,`
+     lose the backslash. A code name with an underscore becomes a letter
+     with a subscript, by the table in `docs/README.md` (`n_embd` is
+     `$n_{\text{embd}}$`). Spacing is a plain space or `\cdot`.
+  2. `\\` only at the end of a line. One matrix row or aligned row per
+     line. A `\\` in the middle of a line becomes a single backslash.
+  3. A subscript follows a letter, never a closing brace: `\mathit{lr_t}`,
+     not `\mathit{lr}_t`. A `}_t` can open Markdown emphasis and a later
+     `n_{` can close it, which swallows every formula in between.
+  4. `\lt` and `\gt` in place of `<` and `>` in an inline formula.
+  5. Inside `<details>`, a display formula is one line: `$$ ... $$`.
+  To check a file the way GitHub renders it, pass it through
+  `gh api markdown` and confirm every formula comes back as a
+  `<math-renderer>` with the source text unchanged.
 
 ## 7. Tooling
 

@@ -111,8 +111,8 @@ parameters to fit on a small dataset.
 of `docs/AUTOGRAD.md`. The code calls it once per pre-activation, so the
 hidden vector has one ReLU node per hidden unit.
 
-The cut is the one nonlinear step. Without it, $\texttt{fc2}\,(\texttt{fc1}\, x)$
-is one linear map, $(\texttt{fc2}\,\texttt{fc1})\, x$, and the wide hidden
+The cut is the one nonlinear step. Without it, $\texttt{fc2} (\texttt{fc1} x)$
+is one linear map, $(\texttt{fc2} \texttt{fc1}) x$, and the wide hidden
 vector gains nothing.
 With it, each hidden unit is either on, with its pre-activation, or off,
 at zero. Which units are on depends on `x`. So different inputs reach
@@ -163,11 +163,22 @@ gets a different output length, and nothing in `mlp` objects.
 The tests use `n_embd = 2` and `n_hidden = 4`, the ratio of the model:
 
 $$
-x = \begin{bmatrix} 1 \\ -1 \end{bmatrix},
+x = \begin{bmatrix}
+1 \\
+-1
+\end{bmatrix},
 \qquad
-\texttt{fc1} = \begin{bmatrix} 1 & 0 \\ 0 & 1 \\ 2 & 1 \\ 1 & -1 \end{bmatrix},
+\texttt{fc1} = \begin{bmatrix}
+1 & 0 \\
+0 & 1 \\
+2 & 1 \\
+1 & -1
+\end{bmatrix},
 \qquad
-\texttt{fc2} = \begin{bmatrix} 1 & 1 & 1 & 1 \\ 0 & 1 & 0 & 0 \end{bmatrix}
+\texttt{fc2} = \begin{bmatrix}
+1 & 1 & 1 & 1 \\
+0 & 1 & 0 & 0
+\end{bmatrix}
 $$
 
 Each row of `fc1` is one hidden unit:

@@ -36,7 +36,7 @@ The forward pass is the chain of what exists:
 
 $$
 \begin{aligned}
-x_i &= \texttt{wte}[\texttt{token}_i] + \texttt{wpe}[i] && \text{one vector per position} \\
+x_i &= \texttt{wte}[t_i] + \texttt{wpe}[i] && \text{one vector per position} \\
 x &= \mathrm{rmsnorm}(x) && \text{per position} \\
 \text{for each block:} \\
 x &= x + \mathrm{attention}(\mathrm{rmsnorm}(x)) && \text{whole sequence, one call} \\
@@ -45,6 +45,8 @@ x &= \mathrm{rmsnorm}(x) && \text{per position} \\
 \text{logit} &= \mathrm{linear}(x, W_{\text{head}}) && \text{per position}
 \end{aligned}
 $$
+
+$t_i$ is the token id at position $i$.
 
 Two words that this document keeps apart:
 
@@ -170,13 +172,7 @@ Two hints:
 <details>
 <summary>Answer</summary>
 
-$$
-\begin{aligned}
-\text{count} = {} & 2 \cdot n_{\text{vocab}} \cdot n_{\text{embd}} \\
-& + n_{\text{ctx}} \cdot n_{\text{embd}} \\
-& + n_{\text{blocks}} \cdot 12 \cdot n_{\text{embd}}^2
-\end{aligned}
-$$
+$$\text{count} = 2 \cdot n_{\text{vocab}} \cdot n_{\text{embd}} + n_{\text{ctx}} \cdot n_{\text{embd}} + n_{\text{blocks}} \cdot 12 \cdot n_{\text{embd}}^2$$
 
 The $2$ is `wte` and `lm_head`. The $12$ is four squares of $n_{\text{embd}}^2$
 for attention and $4 + 4$ for the two rectangles of the MLP, each
