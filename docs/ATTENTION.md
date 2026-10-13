@@ -82,13 +82,14 @@ lines, one per stage.
 
 ### The score
 
-The score of key `j` is:
+The score of key $j$ is:
 
-```
-score[j] = dot(x=q, y=keys[j]) * scale
-```
+$$
+\mathrm{score}_j = (q \cdot \mathrm{keys}_j) \cdot \mathrm{scale}
+$$
 
-`dot` is the function of section 3 of `docs/LAYERS.md`.
+The dot product $q \cdot \mathrm{keys}_j$ is `dot`, the function of section 3
+of `docs/LAYERS.md`.
 
 ### Why the scale
 
@@ -98,7 +99,8 @@ scores gives one weight near one and all other weights near zero, and its
 derivative is then near zero. Training would stop before the model learns
 what to attend to.
 
-Multiply each score by `head_dim ** -0.5`, which is `1 / sqrt(head_dim)`.
+Multiply each score by $\texttt{head\_dim}^{-1/2}$, which is
+$1 / \sqrt{\texttt{head\_dim}}$.
 The scores return to the size where `softmax` has a useful gradient.
 
 `attend` does not compute the scale. It does not know `head_dim`, and the
@@ -106,7 +108,7 @@ caller does. Section 4 says where the float comes from.
 
 ### The weights
 
-`softmax(logits=scores)` turns the `n` scores into `n` weights. Each weight is
+`softmax(logits=scores)` turns the $n$ scores into $n$ weights. Each weight is
 between zero and one, and the weights sum to one. Weight `j` is how much the
 query reads from position `j`.
 
@@ -115,11 +117,11 @@ score. The output is then the one value.
 
 ### The weighted sum
 
-The output has `head_dim` elements. Element `t` is:
+The output has `head_dim` elements. Element $t$ is:
 
-```
-out[t] = weights[0] * values[0][t] + weights[1] * values[1][t] + ...
-```
+$$
+\mathrm{out}_t = \mathrm{weights}_0 \cdot \mathrm{values}_{0,t} + \mathrm{weights}_1 \cdot \mathrm{values}_{1,t} + \cdots
+$$
 
 This is a weighted sum across **positions**, one for each element.
 `linear` sums across the elements of one row. The rows of `values` are
@@ -146,10 +148,11 @@ splits the `n_embd` elements into `n_head` groups of `head_dim`. Each group
 scores and reads on its own, so each group can learn a different reason.
 
 `split_heads` takes a matrix with one row per position. It returns a list
-of `n_head` matrices. Matrix `h` holds elements `h * head_dim` to
-`(h + 1) * head_dim - 1` of every row. With `n_embd = 4` and `n_head = 2`:
+of `n_head` matrices. Matrix $h$ holds elements $h \cdot \texttt{head\_dim}$ to
+$(h + 1) \cdot \texttt{head\_dim} - 1$ of every row. With `n_embd = 4` and
+`n_head = 2`:
 
-| head `h` | elements |
+| head $h$ | elements |
 |----------|----------|
 | 0        | 0, 1     |
 | 1        | 2, 3     |
@@ -210,7 +213,7 @@ not a wrong number.
 
 ### The scale
 
-`scale` is `head_dim ** -0.5`. It is a plain float. The code computes it
+`scale` is $\texttt{head\_dim}^{-1/2}$. It is a plain float. The code computes it
 one time, before the loops, and passes it to every call of `attend`.
 Section 2 says why.
 
@@ -231,13 +234,13 @@ row. Position `i` reads itself and every position before it. It never
 reads a later position, because `attend` never sees one.
 
 A common alternative computes every score for every pair. It then sets the
-scores for `j > i` to minus infinity before `softmax`. `exp` of minus
+scores for $j > i$ to minus infinity before `softmax`. `exp` of minus
 infinity is zero, so those positions receive a weight of zero. The result
 is the same.
 
-The graph is not the same. That method makes `T * T` score nodes per head.
+The graph is not the same. That method makes $T^2$ score nodes per head.
 Half of them carry a weight of zero into every backward pass. The slice
-bound makes `T * (T + 1) / 2` score nodes and no masked node at all.
+bound makes $T(T + 1)/2$ score nodes and no masked node at all.
 
 The causality tests check this by change. Change the input at position 2.
 The outputs at positions 0 and 1 are the same floats, not only near.
@@ -283,5 +286,5 @@ computes the first mix from the content on every call.
 
 With one position, every call of `attend` receives one key, and section 2
 says that the output is then the one value. The output of `attention` is
-`wo @ (wv @ x[0])`, and `wq` and `wk` have no effect. A position with
+$\texttt{wo}\,(\texttt{wv}\, x_0)$, and `wq` and `wk` have no effect. A position with
 nothing to choose between has no use for a query or a key.

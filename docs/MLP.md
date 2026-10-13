@@ -50,9 +50,9 @@ code around it.
 
 The function computes:
 
-```
-y = fc2 @ relu(fc1 @ x)
-```
+$$
+y = \texttt{fc2} \cdot \mathrm{relu}(\texttt{fc1} \cdot x)
+$$
 
 The code has three lines, one per stage. Each line makes a vector, and the
 name of the vector says what it is.
@@ -94,11 +94,12 @@ transpose shape of the other.
 `x` with one row of `fc1`. Call it a **pre-activation**: the value of one
 hidden unit before the cut.
 
-The model in this lab sets `n_hidden` to `4 * n_embd`. This is the ratio
+The model in this lab sets `n_hidden` to $4 \cdot \texttt{n\_embd}$. This is the ratio
 of the first Transformer and the first GPT models, and later models copied
 it. It is a convention, not an outcome of math. The ratio sets the balance
-of parameters between the two blocks: attention has `4 * n_embd^2`, and
-the MLP has `2 * n_hidden * n_embd`, so at ratio 4 the MLP holds twice as
+of parameters between the two blocks: attention has $4\,\texttt{n\_embd}^2$,
+and the MLP has $2\,\texttt{n\_hidden} \cdot \texttt{n\_embd}$, so at ratio $4$
+the MLP holds twice as
 many. Measured loss is flat across a wide range of ratios, so 4 is a safe
 default and an easy lab swap. A wider hidden vector gives the block more
 units to cut, and so more functions it can compute, at the cost of more
@@ -106,12 +107,13 @@ parameters to fit on a small dataset.
 
 ### Cut
 
-`relu` is `max(0, v)`. It is a primitive of the autograd engine, section 6
+`relu` is $\max(0, v)$. It is a primitive of the autograd engine, section 6
 of `docs/AUTOGRAD.md`. The code calls it once per pre-activation, so the
 hidden vector has one ReLU node per hidden unit.
 
-The cut is the one nonlinear step. Without it, `fc2 @ (fc1 @ x)` is one
-linear map, `(fc2 @ fc1) @ x`, and the wide hidden vector gains nothing.
+The cut is the one nonlinear step. Without it, $\texttt{fc2}\,(\texttt{fc1}\, x)$
+is one linear map, $(\texttt{fc2}\,\texttt{fc1})\, x$, and the wide hidden
+vector gains nothing.
 With it, each hidden unit is either on, with its pre-activation, or off,
 at zero. Which units are on depends on `x`. So different inputs reach
 `fc2` through different sets of units, and the block computes a different
@@ -125,13 +127,13 @@ cut unit receives zero, and the row that feeds an on unit receives `x`.
 
 At exactly zero, `relu` passes no gradient. The forward value is zero
 either way, so the choice only matters for the gradient. The point is a
-**kink**: the slope is `0` on one side and `1` on the other, and the
+**kink**: the slope is $0$ on one side and $1$ on the other, and the
 derivative is not defined at the point itself. A central finite difference
 averages the slope on both sides of a point. If a pre-activation is within
-`h` of zero, one side is on and the other is off, and the average matches
+$h$ of zero, one side is on and the other is off, and the average matches
 neither. The autograd gradient picks one side. So before the gradient check
 of group 4 compares anything, it checks that every pre-activation of its
-case is more than `1e-3` from zero, a thousand times `h`. The check makes
+case is more than $10^{-3}$ from zero, a thousand times $h$. The check makes
 the seed choice explicit. A future change of the seed then fails on the
 check and not on a gradient that looks wrong for no reason.
 
@@ -160,19 +162,27 @@ gets a different output length, and nothing in `mlp` objects.
 
 The tests use `n_embd = 2` and `n_hidden = 4`, the ratio of the model:
 
-```
-x   = [1, -1]
-fc1 = [[1, 0],      # unit 0 reads x[0]          ->  1
-       [0, 1],      # unit 1 reads x[1]          -> -1, cut to 0
-       [2, 1],      # unit 2 reads 2*x[0] + x[1] ->  1
-       [1, -1]]     # unit 3 reads x[0] - x[1]   ->  2
-fc2 = [[1, 1, 1, 1],   # output 0 sums every hidden unit -> 4
-       [0, 1, 0, 0]]   # output 1 reads only unit 1      -> 0
-```
+$$
+x = \begin{bmatrix} 1 \\ -1 \end{bmatrix},
+\qquad
+\texttt{fc1} = \begin{bmatrix} 1 & 0 \\ 0 & 1 \\ 2 & 1 \\ 1 & -1 \end{bmatrix},
+\qquad
+\texttt{fc2} = \begin{bmatrix} 1 & 1 & 1 & 1 \\ 0 & 1 & 0 & 0 \end{bmatrix}
+$$
 
-The output is `[4, 0]`. Without the cut it is `[3, -1]`. The second row of
-`fc2` reads only the cut unit, so a missing cut changes both elements and
-the test cannot pass by chance.
+Each row of `fc1` is one hidden unit:
+
+| Unit | Reads        | Pre-activation | After the cut |
+|------|--------------|----------------|---------------|
+| 0    | $x_0$        | $1$            | $1$           |
+| 1    | $x_1$        | $-1$           | $0$           |
+| 2    | $2x_0 + x_1$ | $1$            | $1$           |
+| 3    | $x_0 - x_1$  | $2$            | $2$           |
+
+Output 0 sums every hidden unit: $1 + 0 + 1 + 2 = 4$. Output 1 reads only
+unit 1: $0$. The output is $[4, 0]$. Without the cut it is $[3, -1]$. The
+second row of `fc2` reads only the cut unit, so a missing cut changes both
+elements and the test cannot pass by chance.
 
 ### What `mlp` does not do
 

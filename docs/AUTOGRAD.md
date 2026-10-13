@@ -61,7 +61,7 @@ holds these fields:
 | Field              | Attribute     | Purpose                                                     |
 | ------------------ | ------------- | ----------------------------------------------------------- |
 | forward value      | `forward_val` | the number computed in the forward pass                     |
-| gradient slot      | `gradient`    | dL/d(this value), filled in during backprop, starts at zero |
+| gradient slot      | `gradient`    | $dL/d(\text{this value})$, filled in during backprop, starts at zero |
 | children           | `children`    | pointers to the values that produced this one               |
 | propagate function | `propagate`   | given this node's gradient, push gradient to children       |
 
@@ -100,8 +100,8 @@ the direction in which the values were computed: a child exists before its
 parent, because the inputs are computed first. Keep this picture in mind
 when you read "child" and "parent" in this document.
 
-This is the graph of `L = a * b + a ** 2`. Each arrow points from a node to
-one of its children. The node `a` is a child of `c` and also a child of `d`.
+This is the graph of $L = ab + a^2$. Each arrow points from a node to
+one of its children. The node $a$ is a child of $c$ and also a child of $d$.
 Test group 6 uses this graph.
 
 ```mermaid
@@ -123,21 +123,21 @@ operators of the node class to do this record. Sections 6 and 7 show how.
 > Code: `Node.propagate`
 > Tests: no group of its own. Groups 4 and 6 call it.
 
-Backprop comes to a node `c` with the value `dL/dc`. The node must compute
-`dL/d(child)` for each child and send it to that child. The chain rule
+Backprop comes to a node $c$ with the value $dL/dc$. The node must compute
+$dL/d(\text{child})$ for each child and send it to that child. The chain rule
 gives:
 
-```
-dL/d(child) = dL/dc * dc/d(child)
-```
+$$
+\frac{dL}{d(\text{child})} = \frac{dL}{dc} \cdot \frac{dc}{d(\text{child})}
+$$
 
-The second factor, `dc/d(child)`, is the **local derivative**. It depends only
+The second factor, $dc/d(\text{child})$, is the **local derivative**. It depends only
 on the operation that made `c`.
 
 ### Where the derivative logic lives
 
-The computation occurs **at `c`**, not at the children. `c` knows the
-operation that made it. `c` knows each child. `c` receives the incoming
+The computation occurs **at $c$**, not at the children. $c$ knows the
+operation that made it. $c$ knows each child. $c$ receives the incoming
 gradient. A child knows none of these things. If a child had to compute its
 own gradient, it would have to know each operation that it was part of.
 
@@ -162,14 +162,14 @@ same way.
 > Code: the `+=` in each propagate function
 > Tests: group 5 (accumulation across consumers)
 
-One value can be the input to more than one operation. If weight `w` is used
-two times, `c = w * x` and `d = w * y`, then `c` and `d` will each send a
-gradient to `w`. The true gradient is the **sum** of all paths (multivariable
+One value can be the input to more than one operation. If weight $w$ is used
+two times, $c = wx$ and $d = wy$, then $c$ and $d$ will each send a
+gradient to $w$. The true gradient is the **sum** of all paths (multivariable
 chain rule):
 
-```
-dL/dw = (contribution from c) + (contribution from d)
-```
+$$
+\frac{dL}{dw} = (\text{contribution from } c) + (\text{contribution from } d)
+$$
 
 Thus, each propagate function **adds** to the gradient slot of a child. It
 does not replace the value. In the code, this is `+=`. Section 9 says who
@@ -193,7 +193,7 @@ Each primitive does three things:
 Python has no operator for `exp`, `log`, or `relu`. Thus, they are named
 methods, not dunder methods.
 
-In the text below, `a` is `self`, `b` is `other`, and `c` is the node that
+In the text below, $a$ is `self`, $b$ is `other`, and $c$ is the node that
 the method returns. Each subsection shows the body of the propagate function
 as it is in the code.
 
@@ -213,11 +213,11 @@ The wrapped float is a **leaf**. It has no children. It gets a gradient slot
 that nothing reads. We accept this small waste. The alternative is a second
 code path for floats in each primitive and in each propagate function.
 
-### 6.2 Addition: `c = a + b`
+### 6.2 Addition: $c = a + b$
 
-- `dc/da = 1`, `dc/db = 1`
-- `c` sends `dL/dc` to `a` and to `b` with no change.
-- The values of `a` and `b` are not necessary.
+- $dc/da = 1$, $dc/db = 1$
+- $c$ sends $dL/dc$ to $a$ and to $b$ with no change.
+- The values of $a$ and $b$ are not necessary.
 
 ```python
 def propagate(g: float) -> None:
@@ -225,12 +225,12 @@ def propagate(g: float) -> None:
     other.gradient += g
 ```
 
-### 6.3 Multiplication: `c = a * b`
+### 6.3 Multiplication: $c = ab$
 
-- `dc/da = b`, `dc/db = a`
-- `c` sends `dL/dc * b` to `a`. `c` sends `dL/dc * a` to `b`.
-- `c` must keep a reference to each child. `a` alone does not know the
-  value of `b`.
+- $dc/da = b$, $dc/db = a$
+- $c$ sends $(dL/dc)\, b$ to $a$. $c$ sends $(dL/dc)\, a$ to $b$.
+- $c$ must keep a reference to each child. $a$ alone does not know the
+  value of $b$.
 
 ```python
 def propagate(g: float) -> None:
@@ -238,34 +238,34 @@ def propagate(g: float) -> None:
     other.gradient += g * self.forward_val
 ```
 
-### 6.4 Power: `c = a ** n`
+### 6.4 Power: $c = a^n$
 
-- `n` is a plain number, not a node. It is fixed during the forward pass.
-- `dc/da = n * a ** (n - 1)` (the power rule).
-- `c` sends `dL/dc * n * a ** (n - 1)` to `a`. There is one child, so
+- $n$ is a plain number, not a node. It is fixed during the forward pass.
+- $dc/da = n a^{n-1}$ (the power rule).
+- $c$ sends $(dL/dc)\, n a^{n-1}$ to $a$. There is one child, so
   there is one send.
-- `c` must keep a reference to `a` and must also keep the number `n`. `n` is
+- $c$ must keep a reference to $a$ and must also keep the number $n$. $n$ is
   not a child. It is not in the graph. The propagate function must capture
-  it in some other way. In the code, `n` is the `exponent` parameter of
+  it in some other way. In the code, $n$ is the `exponent` parameter of
   `__pow__`. The function reads it from the enclosing scope.
-- Example: `c = a ** 2` with `a = 3`. Then `dc/da = 2 * 3 = 6`.
+- Example: $c = a^2$ with $a = 3$. Then $dc/da = 2 \cdot 3 = 6$.
 
 ```python
 def propagate(g: float) -> None:
     self.gradient += g * exponent * self.forward_val ** (exponent - 1)
 ```
 
-### 6.5 Exponent: `c = exp(a)`
+### 6.5 Exponent: $c = \exp(a)$
 
-- `dc/da = exp(a)`. This is the value of `c` itself.
-- `c` sends `dL/dc * c` to `a`.
-- The propagate function needs only the forward value of `c`. The forward
+- $dc/da = \exp(a)$. This is the value of $c$ itself.
+- $c$ sends $(dL/dc)\, c$ to $a$.
+- The propagate function needs only the forward value of $c$. The forward
   pass already computed it. Nothing is computed twice. In the code, the
   forward value is held in `result` before the function is written.
-- Softmax needs this: `p_i = exp(x_i) / sum_j exp(x_j)`. The sum is repeated
+- Softmax needs this: $p_i = \exp(x_i) / \sum_j \exp(x_j)$. The sum is repeated
   `+`. The division is `*` with `** -1`. Only `exp` is new.
-- `exp` of a large value overflows. Softmax gives the same `p_i` when the
-  same number is subtracted from each `x_i`. Subtract the largest `x_i` as a
+- `exp` of a large value overflows. Softmax gives the same $p_i$ when the
+  same number is subtracted from each $x_i$. Subtract the largest $x_i$ as a
   plain float. It is not a node. No gradient flows through it. This is exact,
   not an approximation: the derivative of softmax with respect to that shift
   is zero.
@@ -278,13 +278,13 @@ def propagate(g: float) -> None:
     self.gradient += g * result
 ```
 
-### 6.6 Logarithm: `c = log(a)`
+### 6.6 Logarithm: $c = \log(a)$
 
-- `dc/da = 1 / a`
-- `c` sends `dL/dc / a` to `a`.
-- The propagate function needs the forward value of `a`.
-- Cross-entropy loss needs this: `loss = -log(p_target)`.
-- When `p_target` is near zero, `1 / a` is very large. A very large gradient
+- $dc/da = 1/a$
+- $c$ sends $(dL/dc)/a$ to $a$.
+- The propagate function needs the forward value of $a$.
+- Cross-entropy loss needs this: $\text{loss} = -\log(p_{\text{target}})$.
+- When $p_{\text{target}}$ is near zero, $1/a$ is very large. A very large gradient
   here means the model is confidently wrong. If a gradient becomes `inf` or
   `nan`, look here first.
 
@@ -293,15 +293,15 @@ def propagate(g: float) -> None:
     self.gradient += g / self.forward_val
 ```
 
-### 6.7 ReLU: `c = max(0, a)`
+### 6.7 ReLU: $c = \max(0, a)$
 
-- `dc/da = 1` if `a > 0`, else `0`.
-- `c` sends `dL/dc` to `a` when `a > 0`. It sends nothing when `a <= 0`.
-- At `a == 0` the derivative is not defined. We choose `0`. A float lands
-  on exactly `0` almost never, so the choice has no effect in practice.
+- $dc/da = 1$ if $a > 0$, else $0$.
+- $c$ sends $dL/dc$ to $a$ when $a > 0$. It sends nothing when $a \le 0$.
+- At $a = 0$ the derivative is not defined. We choose $0$. A float lands
+  on exactly $0$ almost never, so the choice has no effect in practice.
 - The MLP clamps against the constant `0`.
-- The propagate function needs the forward value of `a`. The test `c > 0`
-  gives the same answer, so the forward value of `c` works too.
+- The propagate function needs the forward value of $a$. The test $c > 0$
+  gives the same answer, so the forward value of $c$ works too.
 
 ```python
 def propagate(g: float) -> None:
@@ -426,7 +426,7 @@ on is correct.
 
 `backward` does the second job of section 8:
 
-1. Set the gradient slot of the root to `1.0`. This is `dL/dL`.
+1. Set the gradient slot of the root to `1.0`. This is $dL/dL$.
 2. Get the ordered list from `_topological_order`.
 3. Walk the list in reverse. For each node, call its propagate function with
    the value of its own gradient slot.
@@ -477,18 +477,18 @@ chain rule at all.
 
 The estimate is the **central finite difference**:
 
-```
-dL/dx ~ (L(x + h) - L(x - h)) / (2h)
-```
+$$
+\frac{dL}{dx} \approx \frac{L(x + h) - L(x - h)}{2h}
+$$
 
-- The test computes the loss two times with plain floats: once with `x`
-  moved up by `h`, once with `x` moved down by `h`. No node is involved.
-- The error of this estimate is proportional to `h ** 2`. With `h = 1e-6`,
-  the error is near `1e-12`. Thus, a tolerance of `1e-6` is honest.
+- The test computes the loss two times with plain floats: once with $x$
+  moved up by $h$, once with $x$ moved down by $h$. No node is involved.
+- The error of this estimate is proportional to $h^2$. With $h = 10^{-6}$,
+  the error is near $10^{-12}$. Thus, a tolerance of $10^{-6}$ is honest.
 - The first test loss uses every operator of sections 6 and 7, with floats
   on both sides. The second test loss is a two-class softmax cross-entropy
   plus a ReLU term, in the shape that the model will use them.
-- The sample points keep `a * b` away from zero. Thus, the ReLU kink is not
+- The sample points keep $ab$ away from zero. Thus, the ReLU kink is not
   hit. The derivative is not defined there, and a numeric estimate across
   the kink is not meaningful.
 

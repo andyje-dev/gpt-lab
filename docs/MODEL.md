@@ -34,15 +34,17 @@ jobs:
 
 The forward pass is the chain of what exists:
 
-```
-x[i]  = wte[token[i]] + wpe[i]          one vector per position
-x     = rmsnorm(x)                      per position
-for each block:
-    x = x + attention(rmsnorm(x))       whole sequence, one call
-    x = x + mlp(rmsnorm(x))             per position
-x     = rmsnorm(x)                      per position
-logit = linear(x, lm_head)              per position
-```
+$$
+\begin{aligned}
+x_i &= \texttt{wte}[\texttt{token}_i] + \texttt{wpe}[i] && \text{one vector per position} \\
+x &= \mathrm{rmsnorm}(x) && \text{per position} \\
+\text{for each block:} \\
+x &= x + \mathrm{attention}(\mathrm{rmsnorm}(x)) && \text{whole sequence, one call} \\
+x &= x + \mathrm{mlp}(\mathrm{rmsnorm}(x)) && \text{per position} \\
+x &= \mathrm{rmsnorm}(x) && \text{per position} \\
+\text{logit} &= \mathrm{linear}(x, \texttt{lm\_head}) && \text{per position}
+\end{aligned}
+$$
 
 Two words that this document keeps apart:
 
@@ -168,17 +170,20 @@ Two hints:
 <details>
 <summary>Answer</summary>
 
-```
-count = 2 * vocab_size * n_embd
-      + context_length * n_embd
-      + n_blocks * 12 * n_embd ** 2
-```
+$$
+\begin{aligned}
+\text{count} = {} & 2 \cdot \texttt{vocab\_size} \cdot \texttt{n\_embd} \\
+& + \texttt{context\_length} \cdot \texttt{n\_embd} \\
+& + \texttt{n\_blocks} \cdot 12 \cdot \texttt{n\_embd}^2
+\end{aligned}
+$$
 
-The `2` is `wte` and `lm_head`. The `12` is four squares of `n_embd ** 2`
-for attention and `4 + 4` for the two rectangles of the MLP, each
-`n_hidden * n_embd` with `n_hidden = 4 * n_embd`. `n_head` does not
-appear: the heads are slices of the same four tables, section 3 of
-`docs/ATTENTION.md`. The test case has `48 + 24 + 864 = 936`.
+The $2$ is `wte` and `lm_head`. The $12$ is four squares of $\texttt{n\_embd}^2$
+for attention and $4 + 4$ for the two rectangles of the MLP, each
+$\texttt{n\_hidden} \cdot \texttt{n\_embd}$ with
+$\texttt{n\_hidden} = 4 \cdot \texttt{n\_embd}$. `n_head` does not appear: the
+heads are slices of the same four tables, section 3 of `docs/ATTENTION.md`.
+The test case has $48 + 24 + 864 = 936$.
 
 </details>
 
@@ -200,11 +205,12 @@ a row the same value.
 
 Why `0.08`. The norms remove the scale of `wte` and `wpe` before any
 block reads them, so their spread only sets a direction. Inside a block,
-`linear` of a vector with root mean square `1` through weights of spread
-`0.08` gives outputs with spread about `0.08 * sqrt(n_embd)`: `0.32` for
-`n_embd = 16`. Each block adds about a third of the stream's scale, and
+`linear` of a vector with root mean square $1$ through weights of spread
+$0.08$ gives outputs with spread about $0.08 \sqrt{\texttt{n\_embd}}$: $0.32$
+for `n_embd = 16`. Each block adds about a third of the stream's scale, and
 the logits start with the same spread. A softmax over logits that close
-to each other is near uniform, so the first loss is near `log(vocab_size)`,
+to each other is near uniform, so the first loss is near
+$\log(\texttt{vocab\_size})$,
 the value section 2 of `docs/LOSS.md` gives for uniform logits. A larger
 spread makes confident wrong guesses at step zero and a larger first
 loss. The value is the one the reference `microgpt.py` uses. The init
@@ -313,17 +319,17 @@ The **residual stream** is the matrix of one vector per position that
 runs from the embedding to the head. Each half of each block reads it,
 computes something, and adds the result back:
 
-```
-residual_stream = residual_stream + half(rmsnorm(residual_stream))
-```
+$$
+x \leftarrow x + \mathrm{half}(\mathrm{rmsnorm}(x))
+$$
 
-The stream is never replaced. It is added to. The name in the code is
-`residual_stream`. Section 1 of `docs/MLP.md` calls it `x` when it says
-where the output of `mlp` goes.
+The stream is never replaced. It is added to. The formula writes the stream
+as $x$, as section 1 of `docs/MLP.md` does when it says where the output of
+`mlp` goes. The name in the code is `residual_stream`.
 
 ### Why add and not replace
 
-With a replace, `x = half(x)`, the gradient from the loss has to pass
+With a replace, $x \leftarrow \mathrm{half}(x)$, the gradient from the loss has to pass
 through every half on its way back to the embedding. Each half is a
 chain of products and a softmax or a ReLU, and each one scales the
 gradient. Over several blocks the product of the scales goes toward
@@ -345,7 +351,7 @@ once for the norm and once for the add. The norm result is read once.
 The other order, norm after the add, puts `rmsnorm` on the one path that
 was free of everything else. It also lets the scale of the stream grow
 with each add, because nothing between the adds brings it back. With
-the norm on the input, each half sees a vector of root mean square `1`,
+the norm on the input, each half sees a vector of root mean square $1$,
 whatever the stream has grown to, and the stream itself is left alone.
 The norm has no learned scale, section 6 of `docs/LAYERS.md`, because
 each one is followed by a `linear` that can learn the same scale.
@@ -353,9 +359,9 @@ each one is followed by a `linear` that can learn the same scale.
 There is one more norm, right after the embedding and before the first
 block. The first block has its own norm on its input, so this one does
 not change what the first half sees. It changes what the first add
-reads: a stream of root mean square `1` instead of the raw sum of two
-rows of spread `0.08`. Without it, the first block's output, with
-spread about `0.32` from section 2, would be several times the stream
+reads: a stream of root mean square $1$ instead of the raw sum of two
+rows of spread $0.08$. Without it, the first block's output, with
+spread about $0.32$ from section 2, would be several times the stream
 it is added to. The issue and the reference keep this norm. Dropping it
 is a lab swap.
 
@@ -363,7 +369,7 @@ is a lab swap.
 
 `residual_stream` and `attention_outputs` are plain lists, section 2 of
 `docs/LAYERS.md`. The `+` operator on two lists is concatenation: it
-gives one list of `2 * T` rows and makes no node. `Node.__add__` is the
+gives one list of $2T$ rows and makes no node. `Node.__add__` is the
 add, and it runs when the left operand is a node. So the add has to
 reach the nodes, two levels down:
 
@@ -435,18 +441,19 @@ the free behavior for `-1` is silent and wrong.
 
 | Stage      | Code                                                      | Shape after        | Nodes made         |
 |------------|-----------------------------------------------------------|--------------------|--------------------|
-| Embed      | `[te + pe for te, pe in zip(wte[token], wpe[i])]` per `i` | `T x n_embd`       | `T * n_embd`       |
-| Norm       | `[rmsnorm(x=row) for row in residual_stream]`             | `T x n_embd`       | per row, see below |
-| Attention  | `attention(x=normed, wq=.., wk=.., wv=.., wo=.., n_head=..)` | `T x n_embd`    | section 6 of `docs/ATTENTION.md` |
-| Add        | the comprehension of section 5                            | `T x n_embd`       | `T * n_embd`       |
-| Norm       | as above                                                  | `T x n_embd`       |                    |
-| MLP        | `[mlp(x=row, fc1=.., fc2=..) for row in normed]`          | `T x n_embd`       | section 2 of `docs/MLP.md` |
-| Add        | as above                                                  | `T x n_embd`       | `T * n_embd`       |
-| Final norm | as above                                                  | `T x n_embd`       |                    |
-| Head       | `[linear(x=row, w=lm_head) for row in normed]`            | `T x vocab_size`   | `2 * T * vocab_size * n_embd` about |
+| Embed      | `[te + pe for te, pe in zip(wte[token], wpe[i])]` per `i` | $T \times \texttt{n\_embd}$       | $T \cdot \texttt{n\_embd}$       |
+| Norm       | `[rmsnorm(x=row) for row in residual_stream]`             | $T \times \texttt{n\_embd}$       | per row, see below |
+| Attention  | `attention(x=normed, wq=.., wk=.., wv=.., wo=.., n_head=..)` | $T \times \texttt{n\_embd}$    | section 6 of `docs/ATTENTION.md` |
+| Add        | the comprehension of section 5                            | $T \times \texttt{n\_embd}$       | $T \cdot \texttt{n\_embd}$       |
+| Norm       | as above                                                  | $T \times \texttt{n\_embd}$       |                    |
+| MLP        | `[mlp(x=row, fc1=.., fc2=..) for row in normed]`          | $T \times \texttt{n\_embd}$       | section 2 of `docs/MLP.md` |
+| Add        | as above                                                  | $T \times \texttt{n\_embd}$       | $T \cdot \texttt{n\_embd}$       |
+| Final norm | as above                                                  | $T \times \texttt{n\_embd}$       |                    |
+| Head       | `[linear(x=row, w=lm_head) for row in normed]`            | $T \times \texttt{vocab\_size}$   | about $2\,T \cdot \texttt{vocab\_size} \cdot \texttt{n\_embd}$ |
 
 The block loop runs the middle six rows `n_blocks` times. Each norm
-makes about `3 * n_embd` nodes per row, section 6 of `docs/LAYERS.md`.
+makes about $3 \cdot \texttt{n\_embd}$ nodes per row, section 6 of
+`docs/LAYERS.md`.
 Each name says what the matrix is at that stage: `residual_stream` for
 the stream, `normed` for the input of a half, `attention_outputs` and
 `mlp_outputs` for what a half returned, `logits` for the result. One
@@ -490,7 +497,7 @@ construction.
 
 The MLP has the ReLU kink of section 2 of `docs/MLP.md`. The float
 reference returns every pre-activation of every block and position,
-and the test checks that each one is more than `1e-3` from zero before
+and the test checks that each one is more than $10^{-3}$ from zero before
 it compares anything.
 
 ### What `forward` does not do

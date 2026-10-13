@@ -51,9 +51,9 @@ of `cross_entropy` over the positions. The model calls only
 
 The function computes:
 
-```
-loss = -log(softmax(logits)[target])
-```
+$$
+\text{loss} = -\log\big(\mathrm{softmax}(\text{logits})[\text{target}]\big)
+$$
 
 In words: turn the logits into probabilities, read the probability of the
 target, and return the negative of its log.
@@ -77,11 +77,11 @@ Two reference values follow from the formula:
 
 | Logits                       | Loss              | Meaning                     |
 |------------------------------|-------------------|-----------------------------|
-| all equal                    | `log(vocab_size)` | the model knows nothing     |
-| target far above every other | about `0`         | the model is sure and right |
+| all equal                    | $\log(\texttt{vocab\_size})$ | the model knows nothing     |
+| target far above every other | about $0$                     | the model is sure and right |
 
 The first is the loss at the start of training, when the weights are small
-and random. With a vocabulary of 4 tokens it is `log 4 = 1.386`.
+and random. With a vocabulary of 4 tokens it is $\log 4 = 1.386$.
 
 ### The code
 
@@ -109,36 +109,38 @@ primitive is needed, and the backward pass needs nothing new.
 
 ### The gradient
 
-Write `p[i]` for the probability of token `i`, `t` for the target, and `S`
-for the sum of the exponentials. Then `p[t] = exp(x[t]) / S`, and:
+Write $p_i$ for the probability of token $i$, $t$ for the target, and $S$
+for the sum of the exponentials. Then $p_t = \exp(x_t) / S$, and:
 
-```
-loss = -log(p[t]) = log(S) - x[t]
-```
+$$
+\text{loss} = -\log(p_t) = \log(S) - x_t
+$$
 
-Take the derivative with respect to logit `i`:
+Take the derivative with respect to logit $i$:
 
-1. `d log(S) / d x[i]` is `exp(x[i]) / S`, which is `p[i]`.
-2. `d x[t] / d x[i]` is `1` if `i` is the target and `0` otherwise.
+1. $d\log(S) / dx_i$ is $\exp(x_i) / S$, which is $p_i$.
+2. $dx_t / dx_i$ is $1$ if $i$ is the target and $0$ otherwise.
 
 So:
 
-```
-d loss / d x[i] = p[i] - [i == t]
-```
+$$
+\frac{d\,\text{loss}}{dx_i} = p_i - [i = t]
+$$
+
+The bracket $[i = t]$ is $1$ when $i$ is the target and $0$ otherwise.
 
 The gradient of each logit is its probability, minus one at the target.
 This has three consequences the tests hold in place:
 
-- Every gradient is between `-1` and `1`, because `p[i]` is between `0`
-  and `1`. A confidently wrong model gets a gradient near `-1` at the
-  target and near `1` at the token it chose. The logits never receive a
+- Every gradient is between $-1$ and $1$, because $p_i$ is between $0$
+  and $1$. A confidently wrong model gets a gradient near $-1$ at the
+  target and near $1$ at the token it chose. The logits never receive a
   gradient larger than one from this loss.
-- The gradients sum to zero, because the `p[i]` sum to one and the one-hot
+- The gradients sum to zero, because the $p_i$ sum to one and the one-hot
   sums to one. A constant added to every logit does not change the loss,
   so the loss has no gradient in that direction.
-- The gradient is never zero for finite logits, because `p[i]` is never
-  exactly `0` or `1`.
+- The gradient is never zero for finite logits, because $p_i$ is never
+  exactly $0$ or $1$.
 
 The autograd engine does not know this formula. It gets the same numbers
 by the chain rule through `log`, the product, and the softmax graph. The
@@ -160,25 +162,27 @@ section 4 of `docs/ATTENTION.md` does.
 The tests use three logits chosen so that the exponentials are whole
 numbers:
 
-```
-logits = [0, log 2, log 3]
-exp    = [1, 2, 3]          sum 6
-p      = [1/6, 2/6, 3/6]
-```
+$$
+\begin{aligned}
+\text{logits} &= [0,\ \log 2,\ \log 3] \\
+\exp(\text{logits}) &= [1,\ 2,\ 3], \qquad S = 6 \\
+p &= [1/6,\ 2/6,\ 3/6]
+\end{aligned}
+$$
 
-With target `2`, the loss is `-log(1/2) = log 2`. The gradient is
-`[1/6, 1/3, -1/2]`: the probabilities, minus one at the target.
+With target $t = 2$, the loss is $-\log(1/2) = \log 2$. The gradient is
+$[1/6,\ 1/3,\ -1/2]$: the probabilities, minus one at the target.
 
 The case is chosen so that each plausible wrong implementation gives a
 different number:
 
-| Implementation                 | Loss at target 2       |
-|--------------------------------|------------------------|
-| Correct                        | `log 2 = 0.693`        |
-| Missing minus sign             | `-0.693`               |
-| Indexes target 1               | `log 3 = 1.099`        |
-| Indexes target 0               | `log 6 = 1.792`        |
-| `log` of the logit, no softmax | `-log(log 3) = -0.094` |
+| Implementation                 | Loss at target 2             |
+|--------------------------------|------------------------------|
+| Correct                        | $\log 2 = 0.693$             |
+| Missing minus sign             | $-0.693$                     |
+| Indexes target 1               | $\log 3 = 1.099$             |
+| Indexes target 0               | $\log 6 = 1.792$             |
+| `log` of the logit, no softmax | $-\log(\log 3) = -0.094$     |
 
 ## 3. The mean over positions
 
@@ -188,19 +192,19 @@ different number:
 The function computes one `cross_entropy` per position and returns their
 mean:
 
-```
-loss = (loss[0] + loss[1] + ... + loss[n-1]) / n
-```
+$$
+\text{loss} = \frac{\text{loss}_0 + \text{loss}_1 + \cdots + \text{loss}_{n-1}}{n}
+$$
 
 ### Why the mean and not the sum
 
-The gradient of a sum of `n` losses is the sum of `n` gradients. Each
+The gradient of a sum of $n$ losses is the sum of $n$ gradients. Each
 position contributes a gradient to the shared weights, so the gradient of
-a sum grows with `n`. The optimizer multiplies the gradient by the learning
+a sum grows with $n$. The optimizer multiplies the gradient by the learning
 rate. With a sum, a sequence twice as long would move the weights twice as
 far per step, and the learning rate would have to change with the sequence
-length. With the mean, every position contributes `1 / n` of its gradient,
-and the step size does not depend on `n`. The learning rate is then one
+length. With the mean, every position contributes $1/n$ of its gradient,
+and the step size does not depend on $n$. The learning rate is then one
 number for every sequence length.
 
 ### The code
@@ -208,13 +212,13 @@ number for every sequence length.
 | Line                                                   | Makes                    |
 |--------------------------------------------------------|--------------------------|
 | `losses = [cross_entropy(...) for ... in zip(..., strict=True)]` | one graph of section 2 per position |
-| `sum_of_losses = losses[0]`, then `+=` in a loop       | `n - 1` sum nodes        |
+| `sum_of_losses = losses[0]`, then `+=` in a loop       | $n - 1$ sum nodes        |
 | `mean_loss = sum_of_losses / len(logits_per_position)` | one product node, one leaf |
 
-The backward pass follows the table. The product sends `1 / n` of the
+The backward pass follows the table. The product sends $1/n$ of the
 incoming gradient to the sum. Each sum passes it unchanged to both of its
-children. So every per-position loss receives `1 / n`, and every logit
-receives its gradient of section 2 divided by `n`. The logits of one
+children. So every per-position loss receives $1/n$, and every logit
+receives its gradient of section 2 divided by $n$. The logits of one
 position do not change the gradient of another. Group 4 has a test for
 each of these facts.
 
@@ -246,19 +250,20 @@ this loss, with numbers.
 
 Take two logits. The target logit is below the other one by a **gap**.
 The shift in `softmax` subtracts the largest logit, so the target becomes
-`-gap` and the other becomes `0`. The probability of the target is then
-close to `exp(-gap)`, and the loss is close to `gap`. The loss is a plain
-number for every gap. The trouble is in the floats that carry it.
+$-\text{gap}$ and the other becomes $0$. The probability of the target is
+then close to $\exp(-\text{gap})$, and the loss is close to $\text{gap}$. The
+loss is a plain number for every gap. The trouble is in the floats that
+carry it.
 
-A float holds numbers down to about `1e-308` at full precision, and then
-smaller numbers with less precision, down to about `5e-324`. Below that it
-holds `0.0`. `exp(-gap)` crosses these limits at gaps of about `709` and
-`745`.
+A float holds numbers down to about $10^{-308}$ at full precision, and then
+smaller numbers with less precision, down to about $5 \cdot 10^{-324}$. Below
+that it holds `0.0`. $\exp(-\text{gap})$ crosses these limits at gaps of about
+$709$ and $745$.
 
 | Gap           | Forward pass                          | Backward pass                          |
 |---------------|---------------------------------------|----------------------------------------|
-| up to 709     | finite, about equal to the gap        | correct, `p - onehot`, about `[1, -1]` |
-| 710 to 745    | finite                                | `1 / p` in the propagate function of `log` overflows to `inf`. The next product makes `nan`. |
+| up to 709     | finite, about equal to the gap        | correct, $p - \text{onehot}$, about $[1, -1]$ |
+| 710 to 745    | finite                                | $1/p$ in the propagate function of `log` overflows to `inf`. The next product makes `nan`. |
 | 746 and past  | `exp` underflows to `0.0`, and `log(0.0)` raises `ValueError` | never runs |
 
 The tests use gaps of `700`, `720`, and `800`, one in each zone.
@@ -272,17 +277,18 @@ would give `nan`. If that happens, this is the first place to look.
 
 The derivation in section 2 gives a second form of the same loss:
 
-```
-loss = log(S) - x[target]
-```
+$$
+\text{loss} = \log(S) - x_{\text{target}}
+$$
 
 This is the **log-softmax** form. It never makes the probability of the
-target, so it has no zones. `log(S)` is finite for every gap, because the
-shift keeps `S` between `1` and `vocab_size`. The forward pass and the
+target, so it has no zones. $\log(S)$ is finite for every gap, because the
+shift keeps $S$ between $1$ and `vocab_size`. The forward pass and the
 backward pass are finite for every input.
 
 The code uses the softmax form. The issue gives the loss as
-`-log(softmax(logits)[target])`, which is the formula every text gives,
+$-\log(\mathrm{softmax}(\text{logits})[\text{target}])$, which is the formula
+every text gives,
 and the code is the formula with one call and one index. The log-softmax
 form would compute the sum of the exponentials a second time outside
 `softmax`, or need a second function in `layers` that returns the log of
@@ -292,6 +298,6 @@ three tests, and the simpler code shows where they come from.
 
 The model in this lab starts with small random weights, so the logits of
 one position differ by a few units, and the loss is near
-`log(vocab_size)`. A gap of `700` needs logits hundreds of units apart.
+$\log(\texttt{vocab\_size})$. A gap of `700` needs logits hundreds of units apart.
 The log-softmax form is a later lab swap, when a trained model gives a
 reason for it.

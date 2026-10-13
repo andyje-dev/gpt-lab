@@ -110,13 +110,13 @@ changed after it is made. `+=` is a shorter spelling of the same thing.
 The dot product of two vectors of the same length is the sum of the
 products of their elements:
 
-```
-d = x[0] * y[0] + x[1] * y[1] + ... + x[n-1] * y[n-1]
-```
+$$
+d = x_0 y_0 + x_1 y_1 + \cdots + x_{n-1} y_{n-1}
+$$
 
 Each `*` makes a product node. Each `+` makes a sum node. The graph is a
 chain of additions. Each addition has one product as a child. This is the
-graph of `d = x0 * y0 + x1 * y1`:
+graph of $d = x_0 y_0 + x_1 y_1$:
 
 ```mermaid
 graph TD
@@ -190,10 +190,10 @@ the graph is the same.
 Nothing in `dot` is new to the autograd engine. The chain rule follows from
 sections 6.2 and 6.3 of `docs/AUTOGRAD.md`:
 
-- Each `+` sends the gradient of `d` unchanged to both of its children.
-  Thus, every product in the chain receives the full gradient of `d`.
-- Each product `x[j] * y[j]` sends `g * y[j]` to `x[j]` and `g * x[j]` to
-  `y[j]`.
+- Each `+` sends the gradient of $d$ unchanged to both of its children.
+  Thus, every product in the chain receives the full gradient of $d$. Call
+  it $g$.
+- Each product $x_j y_j$ sends $g\, y_j$ to $x_j$ and $g\, x_j$ to $y_j$.
 
 ## 4. Linear
 
@@ -203,9 +203,9 @@ sections 6.2 and 6.3 of `docs/AUTOGRAD.md`:
 A linear layer multiplies a vector by a matrix. Output `i` is the dot
 product of `x` with row `i` of `w`:
 
-```
-y[i] = dot(x=x, y=w[i])
-```
+$$
+y_i = x \cdot w_i
+$$
 
 The code is one comprehension over the rows of `w`. There is one output per
 row. The comprehension makes no node of its own. `dot` makes every node in
@@ -219,10 +219,10 @@ smaller graph. A bias is a later lab swap: add it, train, and compare.
 ### The backward pass through linear
 
 Section 3 says what one dot product sends to its inputs. `linear` adds one
-thing: `x[j]` is a child of one product in **every** row. Its gradient slot
-accumulates one term per row, `g[i] * w[i][j]` for each output `i`. This is
-the `+=` of section 5 of `docs/AUTOGRAD.md`. Each weight `w[i][j]` is a
-child of one product only, so it receives `g[i] * x[j]` and nothing else.
+thing: $x_j$ is a child of one product in **every** row. Its gradient slot
+accumulates one term per row, $g_i w_{ij}$ for each output $i$. This is
+the `+=` of section 5 of `docs/AUTOGRAD.md`. Each weight $w_{ij}$ is a
+child of one product only, so it receives $g_i x_j$ and nothing else.
 
 ## 5. Softmax, with the shift
 
@@ -231,11 +231,11 @@ child of one product only, so it receives `g[i] * x[j]` and nothing else.
 
 Softmax turns a vector of logits into a probability distribution:
 
-```
-p[i] = exp(x[i]) / (exp(x[0]) + exp(x[1]) + ... + exp(x[n-1]))
-```
+$$
+p_i = \frac{\exp(x_i)}{\exp(x_0) + \exp(x_1) + \cdots + \exp(x_{n-1})}
+$$
 
-Each `p[i]` is positive and the `p[i]` sum to 1. The code has three stages:
+Each $p_i$ is positive and the $p_i$ sum to $1$. The code has three stages:
 shift, exponentiate, normalize.
 
 ### The shift
@@ -243,16 +243,16 @@ shift, exponentiate, normalize.
 `exp` of a large float overflows. `math.exp(1000.0)` raises an error. The
 logits of an untrained model are small, but nothing keeps them small during
 training. Thus, the code subtracts the largest logit from every logit before
-it calls `exp`. The largest exponent is then `exp(0) = 1`, and nothing
+it calls `exp`. The largest exponent is then $\exp(0) = 1$, and nothing
 overflows.
 
-The shift does not change the output. Subtract the same number `m` from each
-logit. Each `exp(x[i] - m)` is `exp(x[i]) * exp(-m)`. The factor `exp(-m)`
+The shift does not change the output. Subtract the same number $m$ from each
+logit. Each $\exp(x_i - m)$ is $\exp(x_i) \exp(-m)$. The factor $\exp(-m)$
 appears in the numerator and in every term of the denominator. It cancels.
-The `p[i]` are the same for any `m`.
+The $p_i$ are the same for any $m$.
 
 The shift is a **plain float**, read from the forward values of the logits.
-It is not a node. The derivative of softmax with respect to `m` is zero, so
+It is not a node. The derivative of softmax with respect to $m$ is zero, so
 no gradient needs to flow through it.
 
 ### What the shift costs in the graph
@@ -287,14 +287,14 @@ seeded from the first, in the loop shape of section 3.
 
 The division is `* ... ** -1`. The code computes `denominator ** -1`
 **once** and multiplies each exponential by it. This is one power node and
-`n` product nodes. The alternative `exponential / denominator` for each
-output makes a new power node every time, `2n` nodes in all, and the
-gradient slot of the denominator accumulates `n` equal contributions in
+$n$ product nodes. The alternative `exponential / denominator` for each
+output makes a new power node every time, $2n$ nodes in all, and the
+gradient slot of the denominator accumulates $n$ equal contributions in
 place of one. Both give the same gradients. The code uses the smaller graph.
 
 ### A sum of the outputs has no gradient
 
-The `p[i]` sum to one for any logits. So the sum of the outputs is a
+The $p_i$ sum to one for any logits. So the sum of the outputs is a
 constant, and its gradient with respect to every logit is zero. A gradient
 check that summed the outputs into one scalar would pass with every
 gradient at zero and prove nothing. Group 6 weights the outputs with fixed,
@@ -309,13 +309,15 @@ function that returns a vector, so no gradient is zero by construction.
 RMSNorm divides each element of a vector by the root mean square of the
 vector:
 
-```
-rms  = (mean(x ** 2) + eps) ** 0.5
-y[i] = x[i] / rms
-```
+$$
+\mathrm{rms} = \sqrt{\frac{1}{n} \sum_{j} x_j^2 + \epsilon},
+\qquad
+y_i = \frac{x_i}{\mathrm{rms}}
+$$
 
-After the division, the root mean square of `y` is 1. The scale of the input
-is gone. The direction of the input is kept. The code has the stages: square,
+$n$ is the length of $x$. $\epsilon$ is the argument `eps`. After the
+division, the root mean square of $y$ is $1$. The scale of the input is
+gone. The direction of the input is kept. The code has the stages: square,
 sum, mean, add `eps`, power, multiply.
 
 - The squares are a comprehension. The sum is a seeded loop.
@@ -325,28 +327,29 @@ sum, mean, add `eps`, power, multiply.
 - The root and the division are one operation: `** -0.5`. There is no
   square root primitive and no division primitive in the engine. One power
   node gives both, as section 6.4 of `docs/AUTOGRAD.md` allows.
-- The power node is computed once. Each `x[i]` is multiplied by it. This
+- The power node is computed once. Each $x_i$ is multiplied by it. This
   is the same choice as the reciprocal in section 5.
 
 There is no learned scale. In this model, every call of `rmsnorm` is
-followed by a linear layer with no bias. A scale `g[i]` on `y[i]` multiplies
-column `i` of that matrix, because `w[k][i] * (g[i] * y[i])` is
-`(w[k][i] * g[i]) * y[i]`. The matrix can learn the same function. Thus, a
+followed by a linear layer with no bias. A scale $g_i$ on $y_i$ multiplies
+column $i$ of that matrix, because $w_{ki} (g_i y_i)$ is
+$(w_{ki} g_i) y_i$. The matrix can learn the same function. Thus, a
 learned scale adds parameters and nodes but no new function. It can change
 how fast training moves, and that is a later lab swap.
 
 ### Why `eps` is inside the root
 
-A zero vector has `mean(x ** 2) = 0`. With `eps` outside the root, the code
-would compute `0 ** -0.5`, which raises an error. With `eps` inside, the
-scale is `(0 + eps) ** -0.5`, about 316 for `eps = 1e-5`. Every output is
-`0 * 316 = 0`. The forward pass is finite.
+A zero vector has $\frac{1}{n} \sum_j x_j^2 = 0$. With `eps` outside the
+root, the code would compute `0 ** -0.5`, which raises an error. With `eps`
+inside, the scale is $(0 + \epsilon)^{-1/2}$, about $316$ for
+$\epsilon = 10^{-5}$. Every output is $0 \cdot 316 = 0$. The forward pass is
+finite.
 
 The backward pass is also finite. The local derivative of the power node is
-`-0.5 * eps ** -1.5`. This is large but finite. It is multiplied by the
-gradient that reaches the power node, and that gradient is `g * x[i]` from
-each product, which is zero. Thus, nothing reaches the mean or the squares.
-Each `x[i]` receives `g * 316`. Nothing is infinite and nothing is NaN.
+$-\tfrac{1}{2} \epsilon^{-3/2}$. This is large but finite. It is multiplied by
+the gradient that reaches the power node, and that gradient is $g\, x_i$
+from each product, which is zero. Thus, nothing reaches the mean or the
+squares. Each $x_i$ receives $316 g$. Nothing is infinite and nothing is NaN.
 
 For a vector that is not zero, `eps` is small against the mean of the
 squares and changes the result by less than the test tolerance.
@@ -372,8 +375,8 @@ The reasons to use it here:
 > Tests: group 5 (transpose)
 
 The transpose of a matrix swaps its rows and columns. Element `[r][c]` of
-the result is element `[c][r]` of the input. A matrix with `R` rows of `C`
-elements becomes a matrix with `C` rows of `R` elements.
+the result is element `[c][r]` of the input. A matrix with $R$ rows of $C$
+elements becomes a matrix with $C$ rows of $R$ elements.
 
 The code is `zip(*m, strict=True)`. The star passes each row of `m` as a
 separate argument to `zip`. `zip` then yields one tuple per column: the
