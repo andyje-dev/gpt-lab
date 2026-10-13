@@ -42,7 +42,7 @@ x &= \mathrm{rmsnorm}(x) && \text{per position} \\
 x &= x + \mathrm{attention}(\mathrm{rmsnorm}(x)) && \text{whole sequence, one call} \\
 x &= x + \mathrm{mlp}(\mathrm{rmsnorm}(x)) && \text{per position} \\
 x &= \mathrm{rmsnorm}(x) && \text{per position} \\
-\text{logit} &= \mathrm{linear}(x, \texttt{lm\_head}) && \text{per position}
+\text{logit} &= \mathrm{linear}(x, W_{\text{head}}) && \text{per position}
 \end{aligned}
 $$
 
@@ -172,16 +172,16 @@ Two hints:
 
 $$
 \begin{aligned}
-\text{count} = {} & 2 \cdot \texttt{vocab\_size} \cdot \texttt{n\_embd} \\
-& + \texttt{context\_length} \cdot \texttt{n\_embd} \\
-& + \texttt{n\_blocks} \cdot 12 \cdot \texttt{n\_embd}^2
+\text{count} = {} & 2 \cdot n_{\text{vocab}} \cdot n_{\text{embd}} \\
+& + n_{\text{ctx}} \cdot n_{\text{embd}} \\
+& + n_{\text{blocks}} \cdot 12 \cdot n_{\text{embd}}^2
 \end{aligned}
 $$
 
-The $2$ is `wte` and `lm_head`. The $12$ is four squares of $\texttt{n\_embd}^2$
+The $2$ is `wte` and `lm_head`. The $12$ is four squares of $n_{\text{embd}}^2$
 for attention and $4 + 4$ for the two rectangles of the MLP, each
-$\texttt{n\_hidden} \cdot \texttt{n\_embd}$ with
-$\texttt{n\_hidden} = 4 \cdot \texttt{n\_embd}$. `n_head` does not appear: the
+$n_{\text{hidden}} \cdot n_{\text{embd}}$ with
+$n_{\text{hidden}} = 4 \cdot n_{\text{embd}}$. `n_head` does not appear: the
 heads are slices of the same four tables, section 3 of `docs/ATTENTION.md`.
 The test case has $48 + 24 + 864 = 936$.
 
@@ -206,11 +206,11 @@ a row the same value.
 Why `0.08`. The norms remove the scale of `wte` and `wpe` before any
 block reads them, so their spread only sets a direction. Inside a block,
 `linear` of a vector with root mean square $1$ through weights of spread
-$0.08$ gives outputs with spread about $0.08 \sqrt{\texttt{n\_embd}}$: $0.32$
+$0.08$ gives outputs with spread about $0.08 \sqrt{n_{\text{embd}}}$: $0.32$
 for `n_embd = 16`. Each block adds about a third of the stream's scale, and
 the logits start with the same spread. A softmax over logits that close
 to each other is near uniform, so the first loss is near
-$\log(\texttt{vocab\_size})$,
+$\log(n_{\text{vocab}})$,
 the value section 2 of `docs/LOSS.md` gives for uniform logits. A larger
 spread makes confident wrong guesses at step zero and a larger first
 loss. The value is the one the reference `microgpt.py` uses. The init
@@ -441,18 +441,18 @@ the free behavior for `-1` is silent and wrong.
 
 | Stage      | Code                                                      | Shape after        | Nodes made         |
 |------------|-----------------------------------------------------------|--------------------|--------------------|
-| Embed      | `[te + pe for te, pe in zip(wte[token], wpe[i])]` per `i` | $T \times \texttt{n\_embd}$       | $T \cdot \texttt{n\_embd}$       |
-| Norm       | `[rmsnorm(x=row) for row in residual_stream]`             | $T \times \texttt{n\_embd}$       | per row, see below |
-| Attention  | `attention(x=normed, wq=.., wk=.., wv=.., wo=.., n_head=..)` | $T \times \texttt{n\_embd}$    | section 6 of `docs/ATTENTION.md` |
-| Add        | the comprehension of section 5                            | $T \times \texttt{n\_embd}$       | $T \cdot \texttt{n\_embd}$       |
-| Norm       | as above                                                  | $T \times \texttt{n\_embd}$       |                    |
-| MLP        | `[mlp(x=row, fc1=.., fc2=..) for row in normed]`          | $T \times \texttt{n\_embd}$       | section 2 of `docs/MLP.md` |
-| Add        | as above                                                  | $T \times \texttt{n\_embd}$       | $T \cdot \texttt{n\_embd}$       |
-| Final norm | as above                                                  | $T \times \texttt{n\_embd}$       |                    |
-| Head       | `[linear(x=row, w=lm_head) for row in normed]`            | $T \times \texttt{vocab\_size}$   | about $2\,T \cdot \texttt{vocab\_size} \cdot \texttt{n\_embd}$ |
+| Embed      | `[te + pe for te, pe in zip(wte[token], wpe[i])]` per `i` | $T \times n_{\text{embd}}$       | $T \cdot n_{\text{embd}}$       |
+| Norm       | `[rmsnorm(x=row) for row in residual_stream]`             | $T \times n_{\text{embd}}$       | per row, see below |
+| Attention  | `attention(x=normed, wq=.., wk=.., wv=.., wo=.., n_head=..)` | $T \times n_{\text{embd}}$    | section 6 of `docs/ATTENTION.md` |
+| Add        | the comprehension of section 5                            | $T \times n_{\text{embd}}$       | $T \cdot n_{\text{embd}}$       |
+| Norm       | as above                                                  | $T \times n_{\text{embd}}$       |                    |
+| MLP        | `[mlp(x=row, fc1=.., fc2=..) for row in normed]`          | $T \times n_{\text{embd}}$       | section 2 of `docs/MLP.md` |
+| Add        | as above                                                  | $T \times n_{\text{embd}}$       | $T \cdot n_{\text{embd}}$       |
+| Final norm | as above                                                  | $T \times n_{\text{embd}}$       |                    |
+| Head       | `[linear(x=row, w=lm_head) for row in normed]`            | $T \times n_{\text{vocab}}$   | about $2 T n_{\text{vocab}} n_{\text{embd}}$ |
 
 The block loop runs the middle six rows `n_blocks` times. Each norm
-makes about $3 \cdot \texttt{n\_embd}$ nodes per row, section 6 of
+makes about $3 \cdot n_{\text{embd}}$ nodes per row, section 6 of
 `docs/LAYERS.md`.
 Each name says what the matrix is at that stage: `residual_stream` for
 the stream, `normed` for the input of a half, `attention_outputs` and

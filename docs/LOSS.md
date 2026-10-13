@@ -77,7 +77,7 @@ Two reference values follow from the formula:
 
 | Logits                       | Loss              | Meaning                     |
 |------------------------------|-------------------|-----------------------------|
-| all equal                    | $\log(\texttt{vocab\_size})$ | the model knows nothing     |
+| all equal                    | $\log(n_{\text{vocab}})$ | the model knows nothing     |
 | target far above every other | about $0$                     | the model is sure and right |
 
 The first is the loss at the start of training, when the weights are small
@@ -298,6 +298,6 @@ three tests, and the simpler code shows where they come from.
 
 The model in this lab starts with small random weights, so the logits of
 one position differ by a few units, and the loss is near
-$\log(\texttt{vocab\_size})$. A gap of `700` needs logits hundreds of units apart.
+$\log(n_{\text{vocab}})$. A gap of `700` needs logits hundreds of units apart.
 The log-softmax form is a later lab swap, when a trained model gives a
 reason for it.

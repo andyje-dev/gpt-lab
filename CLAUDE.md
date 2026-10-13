@@ -232,7 +232,13 @@ explanations when the user is lost.
 - Numbered steps for a procedure. A table for a comparison.
 - No idioms, no metaphors, no hedging. State the fact.
 - Present tense. "The code calls it once per pre-activation."
-- Code names in backticks. Formulas in fenced blocks.
+- Code names in backticks. Formulas in LaTeX: a display formula in a `$$`
+  block on its own lines, a formula inside a sentence in `$...$`. A code
+  name inside a formula is `\texttt{}`. Never put an underscore inside a
+  formula: GitHub strips the backslash of `\_`, and MathJax rejects a bare
+  underscore in text mode. A code name with an underscore becomes a letter
+  with a subscript, by the table in `docs/README.md` (`n_embd` is
+  `$n_{\text{embd}}$`). Pseudocode and Python stay in fenced blocks.
 
 ## 7. Tooling
 

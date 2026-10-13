@@ -99,8 +99,8 @@ scores gives one weight near one and all other weights near zero, and its
 derivative is then near zero. Training would stop before the model learns
 what to attend to.
 
-Multiply each score by $\texttt{head\_dim}^{-1/2}$, which is
-$1 / \sqrt{\texttt{head\_dim}}$.
+Multiply each score by $d_{\text{head}}^{-1/2}$, which is
+$1 / \sqrt{d_{\text{head}}}$. In a formula, $d_{\text{head}}$ is `head_dim`.
 The scores return to the size where `softmax` has a useful gradient.
 
 `attend` does not compute the scale. It does not know `head_dim`, and the
@@ -148,8 +148,8 @@ splits the `n_embd` elements into `n_head` groups of `head_dim`. Each group
 scores and reads on its own, so each group can learn a different reason.
 
 `split_heads` takes a matrix with one row per position. It returns a list
-of `n_head` matrices. Matrix $h$ holds elements $h \cdot \texttt{head\_dim}$ to
-$(h + 1) \cdot \texttt{head\_dim} - 1$ of every row. With `n_embd = 4` and
+of `n_head` matrices. Matrix $h$ holds elements $h \cdot d_{\text{head}}$ to
+$(h + 1) \cdot d_{\text{head}} - 1$ of every row. With `n_embd = 4` and
 `n_head = 2`:
 
 | head $h$ | elements |
@@ -213,7 +213,7 @@ not a wrong number.
 
 ### The scale
 
-`scale` is $\texttt{head\_dim}^{-1/2}$. It is a plain float. The code computes it
+`scale` is $d_{\text{head}}^{-1/2}$. It is a plain float. The code computes it
 one time, before the loops, and passes it to every call of `attend`.
 Section 2 says why.
 

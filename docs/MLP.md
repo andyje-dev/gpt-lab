@@ -94,11 +94,11 @@ transpose shape of the other.
 `x` with one row of `fc1`. Call it a **pre-activation**: the value of one
 hidden unit before the cut.
 
-The model in this lab sets `n_hidden` to $4 \cdot \texttt{n\_embd}$. This is the ratio
+The model in this lab sets `n_hidden` to $4 \cdot n_{\text{embd}}$. This is the ratio
 of the first Transformer and the first GPT models, and later models copied
 it. It is a convention, not an outcome of math. The ratio sets the balance
-of parameters between the two blocks: attention has $4\,\texttt{n\_embd}^2$,
-and the MLP has $2\,\texttt{n\_hidden} \cdot \texttt{n\_embd}$, so at ratio $4$
+of parameters between the two blocks: attention has $4 n_{\text{embd}}^2$,
+and the MLP has $2 n_{\text{hidden}} n_{\text{embd}}$, so at ratio $4$
 the MLP holds twice as
 many. Measured loss is flat across a wide range of ratios, so 4 is a safe
 default and an easy lab swap. A wider hidden vector gives the block more
