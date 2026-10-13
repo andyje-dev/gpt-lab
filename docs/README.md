@@ -30,28 +30,3 @@ Each numbered section starts with two lines:
 
 A section number with no document name points to the document you are in.
 A reference to another document always names it.
-
-A formula is LaTeX. A formula that stands alone is in a `$$` block. A
-formula inside a sentence is between single `$` signs. Pseudocode and
-Python are in fenced code blocks, not in formulas.
-
-A code name without an underscore keeps its monospace inside a formula, as
-`fc1` is $\texttt{fc1}$. A code name with an underscore becomes a letter
-with a subscript, because the renderer does not accept an underscore inside
-monospace text:
-
-| Code             | Formula            |
-|------------------|--------------------|
-| `n_embd`         | $n_{\text{embd}}$   |
-| `n_hidden`       | $n_{\text{hidden}}$ |
-| `n_blocks`       | $n_{\text{blocks}}$ |
-| `head_dim`       | $d_{\text{head}}$   |
-| `vocab_size`     | $n_{\text{vocab}}$  |
-| `context_length` | $n_{\text{ctx}}$    |
-| `lm_head`        | $W_{\text{head}}$   |
-| `num_steps`      | $n_{\text{steps}}$  |
-
-The numeric gradient check is defined one time, in section 10 of
-`AUTOGRAD.md`. Every test file ends with one, and its group comment points
-to that section. The other documents mention the check only where a fact
-about the module shows up in it.
